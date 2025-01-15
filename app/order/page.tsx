@@ -1,4 +1,3 @@
-// app/order/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -8,6 +7,7 @@ import {
   doc,
   updateDoc,
   serverTimestamp,
+  Timestamp,
 } from "firebase/firestore";
 import { db } from "../utils/firebase";
 
@@ -15,11 +15,29 @@ interface Reagent {
   productNumber: string;
   name: string;
   stock: number;
-  maxExpiry: string;
-  orderStatus: string; // "発注" or ""
-  orderDate?: string;
+  maxExpiry: string;       // YYYY-MM-DD 形式
+  orderStatus: string;     // "発注" or ""
+  orderDate?: string;      // YYYY-MM-DD 形式
   orderQuantity?: number;
   logisticCode?: string;
+}
+
+// Firestore から取得する生データ
+interface FirestoreReagent {
+  name?: string;
+  stock?: number;
+  maxExpiry?: Timestamp;        // Firestore Timestamp
+  orderDate?: Timestamp | null; // 発注日
+  orderQuantity?: number;
+  logisticCode?: string;
+  orderTriggerStock?: number;
+  orderTriggerExpiry?: boolean;
+}
+
+// Timestamp → "YYYY-MM-DD" へ変換
+function formatTimestamp(ts?: Timestamp | null): string {
+  if (!ts) return "";
+  return ts.toDate().toISOString().split("T")[0];
 }
 
 export default function OrderPage() {
@@ -29,66 +47,77 @@ export default function OrderPage() {
     const fetchReagents = async () => {
       const snapshot = await getDocs(collection(db, "reagents"));
       const list: Reagent[] = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        console.log("Firestore data:", data); // Firestore データの確認
 
-        // "発注"の表示ロジックはHomeのチェックと同様or簡略化
+      snapshot.forEach((docSnap) => {
+        // Firestore の生データを型付け
+        const data = docSnap.data() as FirestoreReagent;
+
+        // isOrder を判定 (Home ページと類似ロジック)
         const isOrder =
-          (typeof data.orderTriggerStock === "number" && data.stock <= data.orderTriggerStock) ||
+          (typeof data.orderTriggerStock === "number" &&
+            (data.stock ?? 0) <= data.orderTriggerStock) ||
           (data.orderTriggerExpiry && checkExpiry(data.maxExpiry));
+
         if (isOrder) {
-          const reagent = {
+          const reagent: Reagent = {
             productNumber: docSnap.id,
-            name: data.name || "",
-            stock: data.stock || 0,
+            name: data.name ?? "",
+            stock: data.stock ?? 0,
             maxExpiry: data.maxExpiry
-              ? formatTimestamp(data.maxExpiry) // maxExpiry を文字列に変換
+              ? formatTimestamp(data.maxExpiry)
               : "",
-            orderStatus: isOrder ? "発注" : "",
+            orderStatus: "発注",
             orderDate: data.orderDate
-              ? formatTimestamp(data.orderDate) // orderDate を文字列に変換
+              ? formatTimestamp(data.orderDate)
               : "",
-            orderQuantity: data.orderQuantity || 1,
-            logisticCode: data.logisticCode || "",
+            orderQuantity: data.orderQuantity ?? 1,
+            logisticCode: data.logisticCode ?? "",
           };
-          console.log("Parsed reagent:", reagent); // パース後のデータ確認
-      list.push(reagent);
+          list.push(reagent);
         }
       });
+
       setReagents(list);
     };
 
-    const formatTimestamp = (timestamp: any): string => {
-        if (!timestamp || !timestamp.toDate) return "";
-        const date = timestamp.toDate(); // Timestamp を Date に変換
-        return date.toISOString().split("T")[0]; // "YYYY-MM-DD" 形式で返す
-      };
     fetchReagents();
   }, []);
 
-  const checkExpiry = (expiry: string) => {
+  // maxExpiry の発注基準チェック
+  // 現在日時 +1ヶ月後より期限が早いなら発注対象
+  const checkExpiry = (ts?: Timestamp) => {
+    if (!ts) return false;
     const now = new Date();
-    const oneMonthLater = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
-    const expiryDate = new Date(expiry);
+    const oneMonthLater = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      now.getDate()
+    );
+    const expiryDate = ts.toDate();
     return expiryDate < oneMonthLater;
   };
 
-  // "発注する"にチェックを付けたらorderDateを当日に設定する
+  // "発注する" のチェックボックスがクリックされたとき
   const handleCheck = async (r: Reagent, checked: boolean) => {
     const reagentRef = doc(db, "reagents", r.productNumber);
-    const updatedOrderDate = checked ? serverTimestamp() : null; // Timestamp 型で保存
+    const updatedOrderDate = checked ? serverTimestamp() : null; // Firestore 上では Timestamp or null
+
     await updateDoc(reagentRef, {
       orderDate: updatedOrderDate,
     });
 
-    console.log(`Updated Firestore: ${r.productNumber}, orderDate: ${updatedOrderDate}`);
-    // 画面更新
+    // ローカル state 更新 (画面に表示するため)
     setReagents((prev) =>
       prev.map((item) =>
         item.productNumber === r.productNumber
-        ? { ...item, orderDate: checked ? new Date().toISOString().split("T")[0] : "" }
-        : item
+          ? {
+              ...item,
+              // "今日の日付" または 空文字 をセット
+              orderDate: checked
+                ? new Date().toISOString().split("T")[0]
+                : "",
+            }
+          : item
       )
     );
   };

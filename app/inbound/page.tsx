@@ -8,77 +8,104 @@ import {
   collection,
   addDoc,
   serverTimestamp,
+  Timestamp,
 } from "firebase/firestore";
 import { parseCode } from "../libs/parseCode";
 import { db } from "../utils/firebase";
+
+/** 
+ * ReagentData: Firestore の "reagents" ドキュメントが持つフィールドを型定義。
+ * 最低限、入庫時に使用するフィールドだけを定義しています。
+ */
+interface ReagentData {
+  maxExpiry?: Timestamp;      // Firestore に Timestamp 型で保存想定
+  stock?: number;
+  valueStock?: number;
+  // 必要なら他のフィールドも追加する
+  // e.g. noOrderOnZeroStock?: boolean;
+}
 
 export default function InboundPage() {
   const [scanValue, setScanValue] = useState("");
   const [showPopup, setShowPopup] = useState(false);
   const [inputValueStock, setInputValueStock] = useState<number | null>(null);
 
-  // ★修正: Refs / Data
+  /**
+   * currentReagentRef:
+   *   - doc(db, "reagents", productNumber) の結果 (DocumentReference 型)
+   *   - 使わない場合は null
+   */
   const [currentReagentRef, setCurrentReagentRef] =
     useState<ReturnType<typeof doc> | null>(null);
-  const [currentReagentData, setCurrentReagentData] =
-    useState<Record<string, any> | null>(null);
 
-  // ★修正: これらも state に持つ
+  /**
+   * currentReagentData:
+   *   - Firestore から取得したデータ
+   *   - ReagentData 型で管理 (any ではなくする)
+   */
+  const [currentReagentData, setCurrentReagentData] =
+    useState<ReagentData | null>(null);
+
+  /** バーコード解析後の値を保持 */
   const [currentProductNumber, setCurrentProductNumber] = useState("");
   const [currentLotNumber, setCurrentLotNumber] = useState("");
   const [currentExpiryDate, setCurrentExpiryDate] = useState<Date | null>(null);
 
-  // バーコードをスキャンして「試薬が既に存在するかを確認」→「valueStock があればポップアップ表示」→「なければそのまま更新」
+  /**
+   * バーコードスキャンして「試薬が既に存在するかを確認」→「valueStock があればポップアップ」
+   */
   const handleIncoming = async () => {
     if (!scanValue) return;
     try {
-      // バーコードから productNumber, lotNumber, expiryDate をパース
       const { productNumber, lotNumber, expiryDate } = parseCode(scanValue);
 
       if (!productNumber || typeof productNumber !== "string") {
         throw new Error("productNumber が不正です。バーコードを正しくスキャンしてください。");
       }
 
-      // reagentsコレクションから該当docを取得
+      // 該当docを取得
       const reagentRef = doc(db, "reagents", productNumber);
       const reagentSnap = await getDoc(reagentRef);
-
       if (!reagentSnap.exists()) {
         throw new Error("該当する試薬が存在しません。先に登録してください。");
       }
 
-      // データを state へ保存
-      const reagentData = reagentSnap.data();
+      // ReagentData としてキャスト or 推定
+      const reagentData = reagentSnap.data() as ReagentData;
+
+      // state に格納
       setCurrentProductNumber(productNumber);
-      setCurrentLotNumber(lotNumber);       // ★修正
-      setCurrentExpiryDate(expiryDate);     // ★修正
+      setCurrentLotNumber(lotNumber);
+      setCurrentExpiryDate(expiryDate);
       setCurrentReagentRef(reagentRef);
       setCurrentReagentData(reagentData);
 
-      // 既に valueStock が存在している場合はポップアップを出す
+      // 既に valueStock が 0以外 ならポップアップ表示
       if (reagentData.valueStock !== 0 && reagentData.valueStock !== undefined) {
         setShowPopup(true);
         return;
       }
 
-      // valueStock 未定義なら、直接入庫処理を実行
-      await completeIncoming(reagentRef, reagentData, lotNumber, expiryDate, productNumber);
-    } catch (error) {
+      // valueStock 未設定ならそのまま入庫処理
+      await completeIncoming(
+        reagentRef,
+        reagentData,
+        lotNumber,
+        expiryDate,
+        productNumber,
+      );
+    } catch (error: unknown) {
       console.error(error);
-      alert(error);
+      alert(String(error));
     }
   };
 
   /**
-   * 入庫処理 (共通)
-   * @param reagentRef 該当ドキュメントのリファレンス
-   * @param reagentData 取得したドキュメントデータ
-   * @param lotNumber バーコードから取得したロット
-   * @param expiryDate バーコードから取得した有効期限
+   * 入庫処理 (ポップアップ or 直接) 共通
    */
   const completeIncoming = async (
     reagentRef: ReturnType<typeof doc>,
-    reagentData: Record<string, any>,
+    reagentData: ReagentData,
     lotNumber: string,
     expiryDate: Date,
     productNumber: string,
@@ -88,28 +115,27 @@ export default function InboundPage() {
       return;
     }
     try {
-      // 有効期限の最大値を更新
+      // maxExpiry が Timestamp なら toDate() を呼べる
       const currentMaxExpiry = reagentData.maxExpiry
         ? reagentData.maxExpiry.toDate()
         : new Date("2000-01-01");
+
       const newMaxExpiry = compareDates(expiryDate, currentMaxExpiry);
-      // 個数を +1 する想定
       const newStock = (reagentData.stock || 0) + 1;
 
       // ドキュメントを更新
       await updateDoc(reagentRef, {
-        maxExpiry: newMaxExpiry,
+        maxExpiry: newMaxExpiry, // Firestore へは Date で書き込むと Timestamp に変換される
         stock: newStock,
-        orderDate: null,
-        // ポップアップで入力した valueStock があれば上書き
+        orderDate: null, // 入庫したので発注日はリセット、など
         ...(inputValueStock !== null && { valueStock: inputValueStock }),
       });
 
-      // histories コレクションにログを追加
+      // histories にログを追加
       const historyRef = collection(db, "histories");
       await addDoc(historyRef, {
         productNumber,
-        lotNumber: lotNumber,
+        lotNumber,
         actionType: "inbound",
         date: serverTimestamp(),
       });
@@ -125,7 +151,9 @@ export default function InboundPage() {
     }
   };
 
-  // 日付を比較し、後ろ（より遅い日付）を返す
+  /**
+   * 日付を比較し、"より遅い日付" を返す (max みたいなイメージ)
+   */
   const compareDates = (date1: Date, date2: Date): Date => {
     const d1 = new Date(date1);
     const d2 = new Date(date2);
@@ -142,6 +170,11 @@ export default function InboundPage() {
           placeholder="バーコードをスキャン"
           value={scanValue}
           onChange={(e) => setScanValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              handleIncoming();
+            }
+          }}
         />
         <button
           onClick={handleIncoming}
@@ -169,11 +202,11 @@ export default function InboundPage() {
             <div className="flex space-x-4">
               <button
                 onClick={() =>
-                  // ★修正: lotNumber, expiryDate も state を使って正しく呼ぶ
+                  // currentReagentRef, currentReagentData, currentLotNumber, currentExpiryDate, currentProductNumber を用いて入庫処理
                   completeIncoming(
                     currentReagentRef!,
                     currentReagentData!,
-                    currentLotNumber,        // ポップアップでも同じ lotNumber
+                    currentLotNumber,
                     currentExpiryDate!,
                     currentProductNumber,
                   )

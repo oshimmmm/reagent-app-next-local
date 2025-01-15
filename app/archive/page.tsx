@@ -1,4 +1,3 @@
-// app/archive/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -9,14 +8,32 @@ import {
   orderBy,
   deleteDoc,
   doc,
+  Timestamp,
 } from "firebase/firestore";
 import { db } from "../utils/firebase";
+
+// ---- 追加した型 ----
+interface ArchiveReagent {
+  productNumber: string;
+  name: string;
+}
+
+interface ArchiveHistory {
+  id: string;
+  productNumber: string;
+  lotNumber: string;
+  actionType: string;
+  date: Timestamp; // Firestore Timestamp
+}
 
 export default function ArchivePage() {
   const [startDate, setStartDate] = useState("2024-01-01");
   const [endDate, setEndDate] = useState("2024-12-31");
-  const [histories, setHistories] = useState<any[]>([]);
-  const [reagents, setReagents] = useState<any[]>([]);
+
+  // any[] → ArchiveHistory[], ArchiveReagent[]
+  const [histories, setHistories] = useState<ArchiveHistory[]>([]);
+  const [reagents, setReagents] = useState<ArchiveReagent[]>([]);
+
   const [selectedReagent, setSelectedReagent] = useState("");
 
   // 初期ロード時に試薬リストを取得
@@ -24,10 +41,13 @@ export default function ArchivePage() {
     const fetchReagents = async () => {
       const reagentsRef = collection(db, "reagents");
       const snapshot = await getDocs(reagentsRef);
-      const list: any[] = [];
+      const list: ArchiveReagent[] = [];
       snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        list.push({ productNumber: docSnap.id, name: data.name });
+        const data = docSnap.data() as { name?: string };
+        list.push({
+          productNumber: docSnap.id,
+          name: data.name ?? "",
+        });
       });
       setReagents(list);
     };
@@ -38,18 +58,32 @@ export default function ArchivePage() {
     const historiesRef = collection(db, "histories");
     const qHistories = query(historiesRef, orderBy("date"));
     const snapshot = await getDocs(qHistories);
-    const list: any[] = [];
+
+    const list: ArchiveHistory[] = [];
     snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
+      // Firestoreドキュメントの型
+      const data = docSnap.data() as {
+        productNumber: string;
+        lotNumber: string;
+        actionType: string;
+        date?: Timestamp; // Timestamp型を想定
+      };
+
       if (data.date) {
-        const d = data.date.toDate();
-        const iso = d.toISOString().split("T")[0];
+        const dateObj = data.date.toDate();
+        const iso = dateObj.toISOString().split("T")[0];
         if (iso >= startDate && iso <= endDate) {
-          // 試薬名のフィルタリング
+          // 試薬を選択していればフィルタリング
           if (selectedReagent && data.productNumber !== selectedReagent) {
             return;
           }
-          list.push({ id: docSnap.id, ...data });
+          list.push({
+            id: docSnap.id,
+            productNumber: data.productNumber,
+            lotNumber: data.lotNumber,
+            actionType: data.actionType,
+            date: data.date, // Timestamp
+          });
         }
       }
     });
@@ -59,7 +93,7 @@ export default function ArchivePage() {
   const handleDelete = async (id: string) => {
     const docRef = doc(db, "histories", id);
     await deleteDoc(docRef);
-    setHistories(histories.filter((h) => h.id !== id));
+    setHistories((prev) => prev.filter((h) => h.id !== id));
   };
 
   return (
@@ -99,7 +133,10 @@ export default function ArchivePage() {
             ))}
           </select>
         </div>
-        <button onClick={handleSearch} className="bg-blue-600 text-white px-3 py-1">
+        <button
+          onClick={handleSearch}
+          className="bg-blue-600 text-white px-3 py-1"
+        >
           抽出
         </button>
       </div>
@@ -115,13 +152,15 @@ export default function ArchivePage() {
         </thead>
         <tbody>
           {histories.map((h) => {
-            const d = h.date.toDate();
-            const dateStr = d.toLocaleString();
+            // h.date は Timestamp 型
+            const dateStr = h.date.toDate().toLocaleString();
             return (
               <tr key={h.id}>
                 <td className="border p-2">{dateStr}</td>
                 <td className="border p-2">{h.lotNumber}</td>
-                <td className="border p-2">{h.actionType === "inbound" ? "入庫" : "出庫"}</td>
+                <td className="border p-2">
+                  {h.actionType === "inbound" ? "入庫" : "出庫"}
+                </td>
                 <td className="border p-2 text-center">
                   <button
                     onClick={() => handleDelete(h.id)}

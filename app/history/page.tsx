@@ -1,8 +1,14 @@
-// app/history/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  Timestamp, // Timestamp をインポート
+} from "firebase/firestore";
 import { db } from "../utils/firebase";
 
 interface Reagent {
@@ -10,12 +16,13 @@ interface Reagent {
   name: string;
 }
 
+// Firestore のフィールドが Timestamp 型なら、ここも Timestamp 型にする
 interface HistoryRecord {
   id: string;
   productNumber: string;
   lotNumber: string;
-  actionType: string; // inbound | outbound
-  date?: any; // Timestamp
+  actionType: "inbound" | "outbound";
+  date?: Timestamp; // ← any ではなく Timestamp にする
 }
 
 export default function HistoryPage() {
@@ -57,7 +64,7 @@ export default function HistoryPage() {
         productNumber: data.productNumber,
         lotNumber: data.lotNumber,
         actionType: data.actionType,
-        date: data.date,
+        date: data.date, // Timestamp か undefined の想定
       });
     });
     setHistories(list);

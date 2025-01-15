@@ -71,6 +71,11 @@ export default function OutboundPage() {
           placeholder="バーコードをスキャン"
           value={scanValue}
           onChange={(e) => setScanValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              handleOutbound();
+            }
+          }}
         />
         <button
           onClick={handleOutbound}
