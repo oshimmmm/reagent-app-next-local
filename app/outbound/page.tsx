@@ -1,7 +1,7 @@
 // app/outbound/page.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   doc,
   getDoc,
@@ -15,6 +15,14 @@ import { db } from "../utils/firebase";
 
 export default function OutboundPage() {
   const [scanValue, setScanValue] = useState("");
+
+  // ① ref を準備
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // ② マウント時に input にフォーカス
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   const handleOutbound = async () => {
     if (!scanValue) return;
@@ -34,17 +42,15 @@ export default function OutboundPage() {
         throw new Error("在庫がありません。");
       }
 
-      // 在庫数を -1
       const newStock = currentStock - 1;
 
-      // 出庫したロットナンバーを「使用中ロットナンバー」として設定
-      // (要件が「ホーム画面に表示される使用中ロットナンバーを更新する」という意味の場合)
+      // 使用中ロットナンバーを更新
       await updateDoc(reagentRef, {
         stock: newStock,
         currentLot: lotNumber,
       });
 
-      // historiesコレクションに出庫履歴を保存
+      // 出庫履歴を保存
       const historyRef = collection(db, "histories");
       await addDoc(historyRef, {
         productNumber,
@@ -57,7 +63,7 @@ export default function OutboundPage() {
       setScanValue("");
     } catch (error) {
       console.error(error);
-      alert(error);
+      alert(String(error));
     }
   };
 
@@ -65,7 +71,9 @@ export default function OutboundPage() {
     <div>
       <h1 className="text-2xl font-bold mb-4">出庫</h1>
       <div className="flex space-x-2">
+        {/* ③ ref を割り当てる */}
         <input
+          ref={inputRef}
           type="text"
           className="border px-3 py-2"
           placeholder="バーコードをスキャン"

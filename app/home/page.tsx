@@ -20,9 +20,10 @@ interface ReagentDataFromFirestore {
   orderTriggerValueStock?: number | null;
   stock?: number;
   valueStock?: number;
-  logisticCode?: string;
+  orderValue?: string;
   monthlyRemaining?: number;
   orderQuantity?: number;
+  location?: string;
 }
 
 // コンポーネント内で使う型 (フォーマット後のもの)
@@ -38,7 +39,8 @@ interface Reagent {
   orderTriggerStock: number;
   orderTriggerValueStock: number | null;
   valueStock: number;
-  logisticCode: string;
+  location: string;
+  orderValue: string;
   monthlyRemaining: number;
   orderQuantity: number;
   orderStatus: string; // "発注" or ""
@@ -113,6 +115,8 @@ export default function HomePage() {
   const { user, loading } = useAuth();
   const [reagents, setReagents] = useState<Reagent[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Reagent; direction: 'asc' | 'desc' } | null>(null);
+  const [selectedFilters, setSelectedFilters] = useState<{ [key in keyof Reagent]?: string }>({});
 
   useEffect(() => {
     // 未ログインならリダイレクトなどがある場合はここで
@@ -166,10 +170,11 @@ export default function HomePage() {
           orderTriggerStock: data.orderTriggerStock ?? 0,
           orderTriggerValueStock: data.orderTriggerValueStock ?? null,
           valueStock: data.valueStock ?? 0,
-          logisticCode: data.logisticCode ?? "",
+          orderValue: data.orderValue ?? "",
           monthlyRemaining: data.monthlyRemaining ?? 0,
           orderQuantity: data.orderQuantity ?? 0,
           orderStatus: status,
+          location: data.location ?? "",
         });
       });
 
@@ -180,6 +185,58 @@ export default function HomePage() {
     fetchReagents();
   }, []);
 
+  const requestSort = (key: keyof Reagent) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getHeaderStyle = (key: keyof Reagent) => {
+    if (sortConfig?.key === key) {
+      return { fontWeight: 'bold', color: sortConfig.direction === 'asc' ? 'blue' : 'red' };
+    }
+    return {};
+  };
+
+  const handleFilterChange = (key: keyof Reagent, value: string) => {
+    setSelectedFilters((prev) => ({
+      ...prev,
+      [key]: value || undefined, // 空値は undefined に設定
+    }));
+  };
+  
+  
+  const uniqueValues: { [key in keyof Reagent]?: string[] } = reagents.reduce((acc, reagent) => {
+    Object.keys(reagent).forEach((key) => {
+      const typedKey = key as keyof Reagent;
+      if (!acc[typedKey]) {
+        acc[typedKey] = [];
+      }
+      if (reagent[typedKey] && !acc[typedKey]?.includes(String(reagent[typedKey]))) {
+        acc[typedKey]!.push(String(reagent[typedKey]));
+      }
+    });
+    return acc;
+  }, {} as { [key in keyof Reagent]?: string[] });
+
+  const filteredAndSortedReagents = reagents
+  .filter((reagent) =>
+    Object.entries(selectedFilters).every(([key, value]) =>
+      value ? String(reagent[key as keyof Reagent]).includes(value) : true
+    )
+  )
+  .sort((a, b) => {
+    if (!sortConfig) return 0;
+    const aValue = a[sortConfig.key] || '';
+    const bValue = b[sortConfig.key] || '';
+    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">ホーム</h1>
@@ -189,19 +246,59 @@ export default function HomePage() {
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-gray-200">
-              <th className="p-2 border">試薬名</th>
+              <th className="p-2 border">
+                <div
+                  onClick={() => requestSort('name')}
+                  style={{ ...getHeaderStyle('name') }}
+                  className='text-lg cursor-pointer'
+                >
+                  試薬名
+                </div>
+                <select
+                  value={selectedFilters.name || ''}
+                  onChange={(e) => handleFilterChange('name', e.target.value)}
+                  className="font-normal border border-gray-300 rounded w-full"
+                >
+                  <option value="">すべて</option>
+                  {uniqueValues.name?.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </th>
               <th className="p-2 border">在庫数</th>
               <th className="p-2 border">使用中ロット</th>
               <th className="p-2 border">最長使用期限</th>
               <th className="p-2 border">発注の可否</th>
               <th className="p-2 border">発注数</th>
-              <th className="p-2 border">保管場所</th>
+              <th className="p-2 border">
+                <div
+                  onClick={() => requestSort('location')}
+                  style={{ ...getHeaderStyle('location') }}
+                  className='text-lg cursor-pointer'
+                >
+                  保管場所
+                </div>
+                <select
+                  value={selectedFilters.location || ''}
+                  onChange={(e) => handleFilterChange('location', e.target.value)}
+                  className="font-normal border border-gray-300 rounded w-full"
+                >
+                  <option value="">すべて</option>
+                  {uniqueValues.location?.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </th>
               <th className="p-2 border">物流コード</th>
               <th className="p-2 border">発注日</th>
             </tr>
           </thead>
           <tbody>
-            {reagents.map((r) => (
+            {filteredAndSortedReagents.map((r) => (
               <tr key={r.productNumber} className="text-center">
                 <td className="p-2 border">{r.name}</td>
                 <td className="p-2 border">{r.stock}</td>
@@ -209,9 +306,8 @@ export default function HomePage() {
                 <td className="p-2 border">{r.maxExpiry}</td>
                 <td className="p-2 border">{r.orderStatus}</td>
                 <td className="p-2 border">{r.orderQuantity}</td>
-                {/* もし location が不要なら削除 */}
-                <td className="p-2 border"> {/* location 未使用の場合は空欄 */} </td>
-                <td className="p-2 border">{r.logisticCode}</td>
+                <td className="p-2 border"> {r.location} </td>
+                <td className="p-2 border">{r.orderValue}</td>
                 <td className="p-2 border">{r.orderDate}</td>
               </tr>
             ))}
