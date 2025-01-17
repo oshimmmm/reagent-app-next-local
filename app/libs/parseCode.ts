@@ -17,6 +17,12 @@ export interface ParsedCode {
   
     console.log("gs1code:", gs1code);
 
+    // フォーマット検証（例: GS1 フォーマットにマッチするか）
+    const gs1Regex = /^01\d{14}17\d{6}10.+$/;
+    if (!gs1Regex.test(gs1code)) {
+      throw new Error("入力されたコードは有効な GS1 コードではありません。");
+    }
+
     const productNumber = gs1code.substring(2, 16);
     console.log("productNumber:", productNumber);
     // ロットナンバー

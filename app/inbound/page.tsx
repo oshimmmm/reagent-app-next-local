@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { parseCode } from "../libs/parseCode";
 import { db } from "../utils/firebase";
+import { parseNoGCode } from "../libs/parseNoGCode";
 
 interface ReagentData {
   maxExpiry?: Timestamp;
@@ -21,9 +22,11 @@ interface ReagentData {
 
 export default function InboundPage() {
   const [scanValue, setScanValue] = useState("");
+  const [scanNoGValue, setScanNoGValue] = useState("");
   const [showPopup, setShowPopup] = useState(false);
   const [inputValueStock, setInputValueStock] = useState<number | null>(null);
 
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // エラーメッセージの状態
   const [currentReagentRef, setCurrentReagentRef] =
     useState<ReturnType<typeof doc> | null>(null);
   const [currentReagentData, setCurrentReagentData] =
@@ -80,7 +83,50 @@ export default function InboundPage() {
       );
     } catch (error: unknown) {
       console.error(error);
-      alert(String(error));
+      setErrorMessage(error instanceof Error ? error.message : "不明なエラーが発生しました。");
+    }
+  };
+
+  const handleNoGIncoming = async () => {
+    if (!scanNoGValue) return;
+    try {
+      const { productNumber, lotNumber, expiryDate } = parseNoGCode(scanNoGValue);
+
+      if (!productNumber || typeof productNumber !== "string") {
+        throw new Error(
+          "productNumber が不正です。バーコードを正しくスキャンしてください。"
+        );
+      }
+
+      const reagentRef = doc(db, "reagents", productNumber);
+      const reagentSnap = await getDoc(reagentRef);
+      if (!reagentSnap.exists()) {
+        throw new Error("該当する試薬が存在しません。先に登録してください。");
+      }
+
+      const reagentData = reagentSnap.data() as ReagentData;
+
+      setCurrentProductNumber(productNumber);
+      setCurrentLotNumber(lotNumber);
+      setCurrentExpiryDate(expiryDate);
+      setCurrentReagentRef(reagentRef);
+      setCurrentReagentData(reagentData);
+
+      if (reagentData.valueStock !== 0 && reagentData.valueStock !== undefined) {
+        setShowPopup(true);
+        return;
+      }
+
+      await completeIncoming(
+        reagentRef,
+        reagentData,
+        lotNumber,
+        expiryDate,
+        productNumber
+      );
+    } catch (error: unknown) {
+      console.error(error);
+      setErrorMessage(error instanceof Error ? error.message : "不明なエラーが発生しました。");
     }
   };
 
@@ -120,6 +166,7 @@ export default function InboundPage() {
 
       alert(`入庫が完了しました: [${currentProductNumber}] ロット: ${lotNumber}`);
       setScanValue("");
+      setScanNoGValue("");
       setShowPopup(false);
       setInputValueStock(null);
     } catch (error) {
@@ -143,7 +190,7 @@ export default function InboundPage() {
           ref={inputRef}
           type="text"
           className="border px-3 py-2"
-          placeholder="バーコードをスキャン"
+          placeholder="GS1 バーコードをスキャン"
           value={scanValue}
           onChange={(e) => setScanValue(e.target.value)}
           onKeyDown={(e) => {
@@ -160,12 +207,55 @@ export default function InboundPage() {
         </button>
       </div>
 
+      <div className="flex space-x-2 my-10">
+        {/* ③ ref を割り当てる */}
+        <input
+          type="text"
+          className="border px-3 py-2"
+          placeholder="Roche バーコードをスキャン"
+          value={scanNoGValue}
+          onChange={(e) => setScanNoGValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              handleNoGIncoming();
+            }
+          }}
+        />
+        <button
+          onClick={handleIncoming}
+          className="bg-blue-600 text-white px-4 py-2"
+        >
+          Roche試薬入庫
+        </button>
+      </div>
+
+      <p>*ALK, Arginase-1, Bond Enzyme Pretreatment, HEG1, DISH試薬, MSH2, MUC6, PD-L1(SP142)は、まだ試薬登録していません。
+        <br />
+        上記試薬入庫時は大島を呼んでください。
+      </p>
+
+      {/* エラーメッセージのポップアップ */}
+      {errorMessage && (
+        <div className="fixed inset-0 flex items-center justify-center bg-gray-700 bg-opacity-50">
+          <div className="bg-white p-6 rounded shadow-lg max-w-lg w-full text-center">
+            <h2 className="text-xl font-bold text-red-600 mb-4">エラー</h2>
+            <p className="mb-6">{errorMessage}</p>
+            <button
+              onClick={() => setErrorMessage(null)} // エラーポップアップを閉じる
+              className="bg-red-600 text-white px-4 py-2"
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
+
       {showPopup && (
         <div className="fixed inset-0 flex items-center justify-center bg-gray-700 bg-opacity-50">
           <div className="bg-white p-6 rounded shadow-lg">
             <h2 className="text-xl font-bold mb-4">規格を入力してください</h2>
             <div className="mb-4">
-              <label className="block mb-1 font-semibold">規格 (μL):</label>
+              <label className="block mb-1 font-semibold">規格 (μL) ロシュ試薬はテスト数:</label>
               <input
                 type="number"
                 className="border px-3 py-2 w-full"

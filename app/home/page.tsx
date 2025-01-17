@@ -270,6 +270,7 @@ export default function HomePage() {
               <th className="p-2 border">在庫数</th>
               <th className="p-2 border">使用中ロット</th>
               <th className="p-2 border">最長使用期限</th>
+              <th className="p-2 border">月末残量</th>
               <th className="p-2 border">発注の可否</th>
               <th className="p-2 border">発注数</th>
               <th className="p-2 border">
@@ -304,6 +305,7 @@ export default function HomePage() {
                 <td className="p-2 border">{r.stock}</td>
                 <td className="p-2 border">{r.currentLot}</td>
                 <td className="p-2 border">{r.maxExpiry}</td>
+                <td className="p-2 border">{r.valueStock !== undefined && r.valueStock !== 0 ? r.valueStock : ""}</td>
                 <td className="p-2 border">{r.orderStatus}</td>
                 <td className="p-2 border">{r.orderQuantity}</td>
                 <td className="p-2 border"> {r.location} </td>

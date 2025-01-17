@@ -26,10 +26,10 @@ interface HistoryRecord {
 
 export default function HistoryPage() {
   const [reagents, setReagents] = useState<Reagent[]>([]);
-  const [selectedReagent, setSelectedReagent] = useState<string>(""); // 選択された productNumber
   const [selectedReagentName, setSelectedReagentName] = useState<string>(""); // 選択された試薬の名前
   const [histories, setHistories] = useState<HistoryRecord[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [fullScreenMode, setFullScreenMode] = useState(false); // フルスクリーンモード
 
   useEffect(() => {
     const fetchReagents = async () => {
@@ -49,9 +49,6 @@ export default function HistoryPage() {
   }, []);
 
   const handleShowHistory = async (productNumber: string) => {
-    setSelectedReagent(productNumber);
-
-    // 対応する名前を取得
     const reagent = reagents.find((r) => r.productNumber === productNumber);
     setSelectedReagentName(reagent?.name || "");
 
@@ -78,9 +75,9 @@ export default function HistoryPage() {
   };
 
   return (
-    <div>
+    <div className="flex flex-col items-center">
       <h1 className="text-2xl font-bold mb-4">履歴</h1>
-      <table className="border w-full mb-6">
+      <table className="border w-full sm:w-3/4 lg:w-1/2 mb-6">
         <thead>
           <tr className="bg-gray-200">
             <th className="border p-2">試薬名</th>
@@ -104,40 +101,73 @@ export default function HistoryPage() {
         </tbody>
       </table>
 
-      {/* 履歴表示エリア */}
-      {showHistory && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            maxHeight: "40%",
-            overflowY: "auto",
-            backgroundColor: "white",
-            borderTop: "1px solid #ccc",
-            boxShadow: "0 -2px 5px rgba(0, 0, 0, 0.1)",
-          }}
-        >
-          <div className="flex justify-between items-center px-4 py-2 border-b">
-            <h2 className="text-xl font-semibold">
-              {selectedReagentName} の履歴情報
-            </h2>
-            <button
-              onClick={() => setShowHistory(false)}
-              className="text-red-600 font-bold text-lg"
-            >
-              ×
-            </button>
-          </div>
-          <div className="px-4">
-            {histories.map((h) => (
-              <div key={h.id} className="border p-2 mb-2">
-                <p>〇日付: {h.date?.toDate().toLocaleString() || ""}</p>
-                <p>ロット: {h.lotNumber}</p>
-                <p>{h.actionType === "inbound" ? "入庫" : "出庫"}</p>
+      {/* ポップアップ（モーダル） */}
+      {showHistory && !fullScreenMode && (
+        <div className="fixed inset-0 flex items-center justify-center bg-gray-700 bg-opacity-50 z-50">
+          <div className="bg-white w-3/4 max-w-3xl rounded shadow-lg">
+            <div className="flex justify-between items-center px-4 py-2 border-b">
+              <h2 className="text-xl font-semibold">
+                {selectedReagentName} の履歴情報
+              </h2>
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => setFullScreenMode(true)}
+                  className="bg-green-600 text-white px-4 py-2 rounded"
+                >
+                  フルスクリーン
+                </button>
+                <button
+                  onClick={() => setShowHistory(false)}
+                  className="text-red-600 font-bold text-lg"
+                >
+                  ×
+                </button>
               </div>
-            ))}
+            </div>
+            <div className="px-4 py-4 max-h-96 overflow-y-auto">
+              {histories.map((h) => (
+                <div key={h.id} className="border p-2 mb-2">
+                  <p>〇日付: {h.date?.toDate().toLocaleString() || ""}</p>
+                  <p>ロット: {h.lotNumber}</p>
+                  <p>{h.actionType === "inbound" ? "入庫" : "出庫"}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* フルスクリーンモード */}
+      {fullScreenMode && (
+        <div className="fixed inset-0 bg-white z-50 overflow-auto">
+          <div className="p-4">
+            <h1 className="text-2xl font-bold mb-4">{selectedReagentName} の履歴情報</h1>
+            <div id="history-content">
+              {histories.map((h) => (
+                <div key={h.id} className="border p-2 mb-2">
+                  <p>〇日付: {h.date?.toDate().toLocaleString() || ""}</p>
+                  <p>ロット: {h.lotNumber}</p>
+                  <p>{h.actionType === "inbound" ? "入庫" : "出庫"}</p>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={() => {
+                  setFullScreenMode(false);
+                  window.print(); // 印刷
+                }}
+                className="bg-blue-600 text-white px-4 py-2 rounded"
+              >
+                印刷
+              </button>
+              <button
+                onClick={() => setFullScreenMode(false)}
+                className="bg-red-600 text-white px-4 py-2 rounded ml-4"
+              >
+                戻る
+              </button>
+            </div>
           </div>
         </div>
       )}

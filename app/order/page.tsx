@@ -15,7 +15,8 @@ interface Reagent {
   productNumber: string;
   name: string;
   stock: number;
-  maxExpiry: string;       // YYYY-MM-DD 形式
+  maxExpiry: string;
+  valueStock: number;
   orderStatus: string;     // "発注" or ""
   orderDate?: string;      // YYYY-MM-DD 形式
   orderQuantity?: number;
@@ -26,7 +27,8 @@ interface Reagent {
 interface FirestoreReagent {
   name?: string;
   stock?: number;
-  maxExpiry?: Timestamp;        // Firestore Timestamp
+  maxExpiry?: Timestamp;
+  valueStock?: number;
   orderDate?: Timestamp | null; // 発注日
   orderQuantity?: number;
   logisticCode?: string;
@@ -66,6 +68,7 @@ export default function OrderPage() {
             maxExpiry: data.maxExpiry
               ? formatTimestamp(data.maxExpiry)
               : "",
+            valueStock: data.valueStock ?? 0,
             orderStatus: "発注",
             orderDate: data.orderDate
               ? formatTimestamp(data.orderDate)
@@ -131,6 +134,7 @@ export default function OrderPage() {
             <th className="border p-2">試薬名</th>
             <th className="border p-2">在庫数</th>
             <th className="border p-2">最長使用期限</th>
+            <th className="border p-2">月末残量</th>
             <th className="border p-2">発注の可否</th>
             <th className="border p-2">発注数</th>
             <th className="border p-2">物流コード</th>
@@ -144,6 +148,7 @@ export default function OrderPage() {
               <td className="border p-2">{r.name}</td>
               <td className="border p-2">{r.stock}</td>
               <td className="border p-2">{r.maxExpiry}</td>
+              <td className="p-2 border">{r.valueStock !== undefined && r.valueStock !== 0 ? r.valueStock : ""}</td>
               <td className="border p-2">{r.orderStatus}</td>
               <td className="border p-2">{r.orderQuantity}</td>
               <td className="border p-2">{r.logisticCode}</td>
