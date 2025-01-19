@@ -14,7 +14,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja">
-      <body>
+      <body className="pt-16">
         {/* 
           layout.tsx はサーバーコンポーネントなので 
           ここでは直接 useAuth() は使わず、

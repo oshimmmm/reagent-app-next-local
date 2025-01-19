@@ -1,8 +1,15 @@
-// app/manage/page.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { collection, getDocs, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  collection,
+  getDocs,
+  doc,
+  updateDoc,
+  deleteDoc,
+  addDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../utils/firebase";
 
@@ -18,11 +25,14 @@ export default function ManagePage() {
   const [reagents, setReagents] = useState<Reagent[]>([]);
   const [selectedReagent, setSelectedReagent] = useState<Reagent | null>(null);
   const [newStock, setNewStock] = useState(0);
-  const [newValueStock, setNewValueStock] = useState<number | undefined>(undefined); // 月末残量の状態
+  const [newValueStock, setNewValueStock] = useState<number | undefined>(undefined);
+
+  // ▼ 編集フォームを参照するためのrefを作成
+  const editFormRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!user?.isAdmin) {
-      // 管理者でなければリダイレクトする等(ここでは省略)
+      // 管理者でなければリダイレクト等(省略)
     }
     const fetchReagents = async () => {
       const colRef = collection(db, "reagents");
@@ -34,7 +44,7 @@ export default function ManagePage() {
           productNumber: docSnap.id,
           name: d.name || "",
           stock: d.stock || 0,
-          valueStock: d.valueStock || undefined, // Firestoreから月末残量を取得
+          valueStock: d.valueStock || undefined,
         });
       });
       setReagents(list);
@@ -45,16 +55,50 @@ export default function ManagePage() {
   const handleSelect = (r: Reagent) => {
     setSelectedReagent(r);
     setNewStock(r.stock);
-    setNewValueStock(r.valueStock); // 月末残量を初期化
+    setNewValueStock(r.valueStock);
+  
+    setTimeout(() => {
+      if (editFormRef.current) {
+        // 1) 要素のトップ座標を取得
+        const rect = editFormRef.current.getBoundingClientRect();
+        // 2) 現在のスクロール量を考慮し、ページ全体からのオフセットを計算
+        const elementTop = rect.top + window.scrollY;
+  
+        // 3) ヘッダーの高さなど分だけ引く (例: 100px)
+        const offset = 100; 
+        const scrollTarget = elementTop - offset;
+  
+        // 4) スムーズスクロール実行
+        window.scrollTo({
+          top: scrollTarget,
+          behavior: "smooth",
+        });
+      }
+    }, 0);
   };
+  
 
   const handleUpdate = async () => {
     if (!selectedReagent) return;
+
     const reagentRef = doc(db, "reagents", selectedReagent.productNumber);
     await updateDoc(reagentRef, {
       stock: newStock,
-      valueStock: newValueStock || null, // 月末残量をFirestoreに保存
+      valueStock: newValueStock || null,
     });
+
+    const historiesRef = collection(db, "histories");
+    await addDoc(historiesRef, {
+      productNumber: selectedReagent.productNumber,
+      actionType: "update",
+      date: serverTimestamp(),
+      user: user?.email || user?.uid || "unknown",
+      oldStock: selectedReagent.stock,
+      newStock: newStock,
+      oldValueStock: selectedReagent.valueStock ?? null,
+      newValueStock: newValueStock ?? null,
+    });
+
     alert("更新しました");
   };
 
@@ -63,62 +107,102 @@ export default function ManagePage() {
     const reagentRef = doc(db, "reagents", selectedReagent.productNumber);
     await deleteDoc(reagentRef);
     alert("削除しました");
+
+    setReagents((prev) =>
+      prev.filter((r) => r.productNumber !== selectedReagent.productNumber)
+    );
     setSelectedReagent(null);
-    setReagents(reagents.filter((r) => r.productNumber !== selectedReagent.productNumber));
   };
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-4">試薬情報編集</h1>
-      <div className="flex space-x-4">
-        <div className="w-1/2">
-          <h2 className="text-xl font-semibold mb-2">試薬一覧</h2>
-          <ul>
-            {reagents.map((r) => (
-              <li key={r.productNumber} className="mb-2">
-                <button
-                  onClick={() => handleSelect(r)}
-                  className="underline text-blue-600"
-                >
-                  {r.name} (在庫: {r.stock})
-                </button>
-              </li>
-            ))}
-          </ul>
+    <div className="container mx-auto px-4 py-8">
+      {/* ページタイトル */}
+      <h1 className="text-3xl font-bold text-center mb-8">試薬情報編集</h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* ▼ 試薬一覧 */}
+        <div className="bg-white shadow-md rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">試薬一覧</h2>
+          {reagents.length === 0 ? (
+            <p className="text-gray-500">試薬がありません。</p>
+          ) : (
+            <ul className="space-y-2">
+              {reagents.map((r) => (
+                <li key={r.productNumber}>
+                  <button
+                    onClick={() => handleSelect(r)}
+                    className="w-full text-left px-3 py-2 rounded-lg 
+                               hover:bg-blue-50 text-blue-600 
+                               transition-colors underline"
+                  >
+                    {r.name}{" "}
+                    <span className="text-sm text-gray-600">
+                      (在庫: {r.stock})
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-        <div className="w-1/2">
-          {selectedReagent && (
-            <div className="p-4 border rounded">
-              <h2 className="text-xl font-semibold mb-2">
+
+        {/* ▼ 編集フォームカード */}
+        <div
+          ref={editFormRef} // ▼ refを付ける
+          className="bg-white shadow-md rounded-lg p-6"
+        >
+          {selectedReagent ? (
+            <>
+              <h2 className="text-xl font-semibold mb-4">
                 {selectedReagent.name} の編集
               </h2>
+
+              {/* 在庫数 */}
               <div className="mb-4">
-                <label className="block mb-1">在庫数</label>
+                <label className="block mb-1 font-medium">在庫数</label>
                 <input
                   type="number"
                   value={newStock}
                   onChange={(e) => setNewStock(Number(e.target.value))}
-                  className="border px-3 py-2 w-full"
+                  className="border border-gray-300 rounded px-3 py-2 w-full 
+                             focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
-              <div className="mb-4">
-                <label className="block mb-1">月末残量</label>
+
+              {/* 月末残量 */}
+              <div className="mb-6">
+                <label className="block mb-1 font-medium">月末残量</label>
                 <input
                   type="number"
                   value={newValueStock !== undefined ? newValueStock : ""}
                   onChange={(e) => setNewValueStock(Number(e.target.value))}
-                  className="border px-3 py-2 w-full"
+                  className="border border-gray-300 rounded px-3 py-2 w-full
+                             focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
-              <div className="flex space-x-2">
-                <button onClick={handleUpdate} className="bg-green-600 text-white px-4 py-2">
+
+              {/* ボタン */}
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={handleUpdate}
+                  className="bg-green-600 text-white px-4 py-2 rounded 
+                             hover:bg-green-700 transition-colors"
+                >
                   更新
                 </button>
-                <button onClick={handleDelete} className="bg-red-600 text-white px-4 py-2">
+                <button
+                  onClick={handleDelete}
+                  className="bg-red-600 text-white px-4 py-2 rounded 
+                             hover:bg-red-700 transition-colors"
+                >
                   試薬情報削除
                 </button>
               </div>
-            </div>
+            </>
+          ) : (
+            <p className="text-gray-500">
+              左の一覧から編集する試薬を選択してください。
+            </p>
           )}
         </div>
       </div>

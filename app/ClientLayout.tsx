@@ -22,7 +22,11 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      {user && <Header />}
+      {user && (
+        <div className="fixed top-0 left-0 w-full z-50 h-16">
+          <Header />
+        </div>
+      )}
       <main>{children}</main>
     </>
   );

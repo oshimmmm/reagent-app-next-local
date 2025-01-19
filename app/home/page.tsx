@@ -20,9 +20,9 @@ interface ReagentDataFromFirestore {
   orderTriggerValueStock?: number | null;
   stock?: number;
   valueStock?: number;
-  orderValue?: string;
+  orderValue?: string; //物流コード
   monthlyRemaining?: number;
-  orderQuantity?: number;
+  orderQuantity?: number; // 発注数
   location?: string;
 }
 
@@ -176,6 +176,7 @@ export default function HomePage() {
           orderStatus: status,
           location: data.location ?? "",
         });
+        console.log("dataList is:", dataList);
       });
 
       setReagents(dataList);
@@ -229,8 +230,10 @@ export default function HomePage() {
   )
   .sort((a, b) => {
     if (!sortConfig) return 0;
-    const aValue = a[sortConfig.key] || '';
-    const bValue = b[sortConfig.key] || '';
+  
+    const aValue = (a[sortConfig.key] || '').toString().toLowerCase(); // 小文字に変換
+    const bValue = (b[sortConfig.key] || '').toString().toLowerCase(); // 小文字に変換
+  
     if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
     if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
     return 0;
@@ -238,8 +241,8 @@ export default function HomePage() {
 
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-4">ホーム</h1>
+    <div className="container mx-auto px-4">
+      <h1 className="text-2xl font-bold my-4">ホーム</h1>
       {loadingData ? (
         <p>読み込み中...</p>
       ) : (

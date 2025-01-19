@@ -101,131 +101,153 @@ export default function RegisterPage() {
   };
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-4">試薬登録</h1>
-
+    <div className="container mx-auto px-6 py-8">
+      <h1 className="text-3xl font-bold mb-6 text-center">試薬登録</h1>
+  
       {/* 試薬名の入力フィールド */}
-      <div className="mb-4">
-        <label className="block mb-1 font-semibold">試薬名:</label>
+      <div className="mb-6">
+        <label className="block text-lg font-semibold mb-2">試薬名:</label>
         <input
-          className="border px-3 py-2 w-full"
+          className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-400"
           placeholder="試薬名を入力"
           value={reagentName}
           onChange={(e) => setReagentName(e.target.value)}
         />
       </div>
-
-      {/* GS1 バーコード: */}
-      <div className="flex items-center mb-4">
+  
+      {/* 物流コード */}
+      <div className="mb-6">
+        <label className="block text-lg font-semibold mb-2">物流コード:</label>
         <input
-          className="border px-3 py-2 mr-2"
-          placeholder="GS1バーコードをスキャン"
-          value={scanValue}
-          onChange={(e) => setScanValue(e.target.value)}
-        />
-        <button onClick={handleRegister} className="bg-blue-600 text-white px-4 py-2">
-          GS1登録
-        </button>
-      </div>
-
-      {/* ロシュ試薬用バーコード: */}
-      <div className="flex items-center mb-4">
-        <input
-          className="border px-3 py-2 mr-2"
-          placeholder="【ロシュ】 バーコードをスキャン"
-          value={nonGs1ScanValue}
-          onChange={(e) => setNonGs1ScanValue(e.target.value)}
-        />
-        <button onClick={handleNonGs1Register} className="bg-green-600 text-white px-4 py-2">
-          ロシュ試薬登録
-        </button>
-      </div>
-
-      {/* ここで物流コード入力欄を追加 */}
-      <div className="mb-4">
-        <label className="block mb-1 font-semibold">物流コード:</label>
-        <input
-          className="border px-3 py-2 w-full"
+          className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-indigo-400"
           placeholder="物流コードを入力"
           value={orderValue}
           onChange={(e) => setOrderValue(e.target.value)}
         />
       </div>
-
-      <div className="mb-4">
-        <label className="block mb-1 font-semibold">保管場所:</label>
+  
+      {/* 保管場所 */}
+      <div className="mb-6">
+        <label className="block text-lg font-semibold mb-2">保管場所:</label>
         <input
-          className="border px-3 py-2 w-full"
-          placeholder="物流コードを入力"
+          className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          placeholder="保管場所を入力"
           value={location}
           onChange={(e) => setLocation(e.target.value)}
         />
       </div>
-      
-      <div className="mb-4">
-        <label className="block mb-1 font-semibold">発注数:</label>
+  
+      {/* 発注数 */}
+      <div className="mb-6">
+        <label className="block text-lg font-semibold mb-2">発注数:</label>
         <input
           type="number"
+          className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-indigo-400"
           value={orderQuantity}
           onChange={(e) => setOrderQuantity(Number(e.target.value))}
-          className="border px-3 py-2"
         />
       </div>
-
+  
       {/* 以下、既存の設定項目 */}
-      <div className="mb-4">
-        <label className="block mb-1 font-semibold">在庫数がいくつ以下になったら発注するか:</label>
+      <div className="mb-6">
+        <label className="block text-lg font-semibold mb-2">
+          在庫数がいくつ以下になったら発注するか:
+        </label>
         <input
           type="number"
+          className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-indigo-400"
           value={orderTriggerStock}
           onChange={(e) => setOrderTriggerStock(Number(e.target.value))}
-          className="border px-3 py-2"
         />
       </div>
-
-      <div className="mb-4">
-        <label className="inline-flex items-center space-x-2">
+  
+      {/* 在庫が0でも発注しない */}
+      <div className="mb-6">
+        <label className="inline-flex items-center space-x-3">
           <input
             type="checkbox"
+            className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             checked={noOrderOnZeroStock}
             onChange={(e) => setNoOrderOnZeroStock(e.target.checked)}
           />
-          <span>在庫が0でも発注しない</span>
+          <span className="text-lg font-semibold">在庫が0でも発注しない</span>
         </label>
       </div>
-
+  
+      {/* 月末残量と規格 */}
       {noOrderOnZeroStock && (
-        <div className="mb-4">
-          <label className="block mb-1 font-semibold">
-            月末残量がいくつ以下になったら発注するか:
-          </label>
-          <input
-            type="number"
-            value={orderTriggerValueStock}
-            onChange={(e) => setOrderTriggerValueStock(Number(e.target.value))}
-            className="border px-3 py-2"
-          />
-
-          <label className="block mb-1 font-semibold">何μL規格か？:</label>
-          <input
-            type="number"
-            value={valueStock}
-            onChange={(e) => setValueStock(Number(e.target.value))}
-            className="border px-3 py-2"
-          />
+        <div className="space-y-6 mb-6">
+          <div>
+            <label className="block text-lg font-semibold mb-2">
+              月末残量がいくつ以下になったら発注するか:
+            </label>
+            <input
+              type="number"
+              className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              value={orderTriggerValueStock}
+              onChange={(e) => setOrderTriggerValueStock(Number(e.target.value))}
+            />
+          </div>
+  
+          <div>
+            <label className="block text-lg font-semibold mb-2">何μL規格か？:</label>
+            <input
+              type="number"
+              className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              value={valueStock}
+              onChange={(e) => setValueStock(Number(e.target.value))}
+            />
+          </div>
         </div>
       )}
-
-      <div>
-        <label className="inline-flex items-center space-x-2 mb-4">
+  
+      {/* 最長使用期限 */}
+      <div className="mb-6">
+        <label className="inline-flex items-center space-x-3">
           <input
             type="checkbox"
+            className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             checked={orderTriggerExpiry}
             onChange={(e) => setOrderTriggerExpiry(e.target.checked)}
           />
-          <span>最長使用期限が1ヶ月未満となったら必ず発注する</span>
+          <span className="text-lg font-semibold">
+            最長使用期限が1ヶ月未満となったら必ず発注する
+          </span>
         </label>
+      </div>
+
+      {/* GS1 バーコード */}
+      <div className="flex items-center space-x-4 mb-6">
+        <input
+          className="border border-gray-300 rounded-lg px-4 py-2 w-1/3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          placeholder="GS1バーコードをスキャン"
+          value={scanValue}
+          onChange={(e) => setScanValue(e.target.value)}
+        />
+        <button
+          onClick={handleRegister}
+          className="bg-blue-600 text-white px-8 py-4 rounded-lg text-lg hover:bg-blue-700 transition-colors"
+        >
+          GS1登録
+        </button>
+      </div>
+  
+      {/* ロシュ試薬用バーコード */}
+      <div className="flex items-center space-x-4 mb-6">
+        <input
+          className="border border-gray-300 rounded-lg px-4 py-2 w-1/3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          placeholder="【ロシュ】 バーコードをスキャン"
+          value={nonGs1ScanValue}
+          onChange={(e) => setNonGs1ScanValue(e.target.value)}
+        />
+        <button
+          onClick={handleNonGs1Register}
+          className="bg-green-600 text-white px-8 py-4 rounded-lg text-lg hover:bg-green-700 transition-colors"
+        >
+          ロシュ試薬登録
+        </button>
       </div>
     </div>
   );
+  
 }

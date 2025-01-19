@@ -19,3 +19,10 @@ body {
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ▼ ここから追加：印刷時に隠したいクラス */
+@media print {
+  .hide-on-print {
+    display: none !important;
+  }
+}
