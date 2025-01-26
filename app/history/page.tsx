@@ -29,15 +29,39 @@ interface HistoryRecord {
   newValueStock?: number;
 }
 
+/** 履歴を「productNumberごと」にまとめたいので、グループ用の型を定義 */
+interface GroupedHistory {
+  productNumber: string;
+  reagentName: string; // 見やすいように試薬名も含める
+  records: HistoryRecord[]; // その製品番号に属する履歴の配列
+}
+
+// ▼ viewMode というステートで、個別表示か範囲表示かを管理する
+type ViewMode = "none" | "individual" | "range";
+
 export default function HistoryPage() {
   const [reagents, setReagents] = useState<Reagent[]>([]);
   const [selectedProductNumber, setSelectedProductNumber] = useState("");
   const [selectedReagentName, setSelectedReagentName] = useState("");
   const [histories, setHistories] = useState<HistoryRecord[]>([]);
 
-  // 履歴部分の表示領域にrefを立てる
+  // ▼ 日付範囲指定用
+  const [startDate, setStartDate] = useState(""); // 例: "2025-01-01"
+  const [endDate, setEndDate] = useState("");     // 例: "2025-01-31"
+  const [rangeHistories, setRangeHistories] = useState<GroupedHistory[]>([]);
+
+  // ▼ 表示モード ("none" | "individual" | "range")
+  const [viewMode, setViewMode] = useState<ViewMode>("none");
+
+  // ▼ 個別履歴表示領域
   const historyContainerRef = useRef<HTMLDivElement>(null);
 
+  // ▼ 範囲検索結果表示領域
+  const rangeContainerRef = useRef<HTMLDivElement>(null);
+
+  // ------------------
+  // 初回に試薬一覧を取得
+  // ------------------
   useEffect(() => {
     const fetchReagents = async () => {
       const reagentsRef = collection(db, "reagents");
@@ -55,14 +79,34 @@ export default function HistoryPage() {
     fetchReagents();
   }, []);
 
-  // 「履歴表示」ボタンが押されたら、その試薬(productNumber)に関連する履歴を取得
+  // ------------------
+  // (2) rangeHistories がセットされたらスクロール
+  // ------------------
+  useEffect(() => {
+    if (viewMode === "range" && rangeHistories.length > 0) {
+      // 次のtickでスクロール
+      setTimeout(() => {
+        rangeContainerRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 0);
+    }
+  }, [viewMode, rangeHistories]);
+
+  // ------------------
+  // 1) 個別試薬の履歴表示
+  // ------------------
   const handleShowHistory = async (productNumber: string) => {
-    // 選択された試薬の情報を取得して保存
+    // ビューを「個別表示」に切り替え
+    setViewMode("individual");
+
+    // 範囲検索の結果をクリアしておく
+    setRangeHistories([]);
+
+    // 選択された試薬名を表示するため
     const reagent = reagents.find((r) => r.productNumber === productNumber);
     setSelectedReagentName(reagent?.name || "");
     setSelectedProductNumber(productNumber);
 
-    // Firestoreの"histories"コレクションから該当するデータを取得
+    // histories 取得
     const historiesRef = collection(db, "histories");
     const qHistories = query(
       historiesRef,
@@ -83,13 +127,13 @@ export default function HistoryPage() {
         user: data.user,
         oldStock: data.oldStock,
         newStock: data.newStock,
+        oldValueStock: data.oldValueStock,
+        newValueStock: data.newValueStock,
       });
     });
-    console.log("list is", list);
     setHistories(list);
 
-    // 履歴をstateにセットした直後、スクロールを実行
-    // setTimeoutやrequestAnimationFrameで、再レンダリング後にスクロールするようタイミングをずらす
+    // スクロール
     setTimeout(() => {
       if (historyContainerRef.current) {
         historyContainerRef.current.scrollIntoView({ behavior: "smooth" });
@@ -97,14 +141,131 @@ export default function HistoryPage() {
     }, 0);
   };
 
+  // ------------------
+  // 2) 日付範囲の全履歴
+  // ------------------
+  const handleShowAllHistoriesInRange = async () => {
+    // ビューを「範囲検索」に切り替え
+    setViewMode("range");
+
+    // 個別選択の結果をクリアしておく
+    setSelectedProductNumber("");
+    setSelectedReagentName("");
+    setHistories([]);
+
+    // 日付チェック
+    if (!startDate || !endDate) {
+      alert("開始日と終了日を指定してください。");
+      return;
+    }
+
+    const start = new Date(`${startDate}T00:00:00`);
+    const end = new Date(`${endDate}T23:59:59`);
+    if (start > end) {
+      alert("開始日は終了日より後にはできません。");
+      return;
+    }
+
+    try {
+      const historiesRef = collection(db, "histories");
+      const qHistories = query(
+        historiesRef,
+        where("date", ">=", start),
+        where("date", "<=", end),
+        orderBy("date", "desc")
+      );
+      const snapshot = await getDocs(qHistories);
+
+      const list: HistoryRecord[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          productNumber: data.productNumber,
+          lotNumber: data.lotNumber,
+          actionType: data.actionType,
+          date: data.date,
+          user: data.user,
+          oldStock: data.oldStock,
+          newStock: data.newStock,
+          oldValueStock: data.oldValueStock,
+          newValueStock: data.newValueStock,
+        });
+      });
+
+      // グループ化
+      const map = new Map<string, HistoryRecord[]>();
+      list.forEach((h) => {
+        const arr = map.get(h.productNumber) || [];
+        arr.push(h);
+        map.set(h.productNumber, arr);
+      });
+
+      const grouped: GroupedHistory[] = [];
+      map.forEach((records, productNumber) => {
+        const reagent = reagents.find((r) => r.productNumber === productNumber);
+        const reagentName = reagent?.name || "不明な試薬";
+        grouped.push({
+          productNumber,
+          reagentName,
+          records,
+        });
+      });
+
+      setRangeHistories(grouped);
+
+    } catch (error) {
+      console.error("範囲検索エラー:", error);
+      alert("範囲検索中にエラーが発生しました。");
+    }
+  };
+
+  // ▼ 日付フォーマット関数の例
+  function formatDateString(ymd: string): string {
+    if (!ymd) return "";
+    const [yyyy, mm, dd] = ymd.split("-");
+    if (!yyyy || !mm || !dd) return "";
+    return `${yyyy}年${mm}月${dd}日`;
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* 画面上部の見出し(印刷時に不要なため hide-on-print) */}
+      {/* 見出し(印刷時に非表示) */}
       <h1 className="text-3xl font-bold text-center mb-8 hide-on-print">
         履歴管理
       </h1>
 
-      {/* ▼ 印刷時に不要な要素は「hide-on-print」クラスで非表示にする */}
+      {/* 日付範囲の指定フォーム + ボタン */}
+      <div className="hide-on-print max-w-xl mx-auto mb-8">
+        <div className="flex flex-col md:flex-row items-end space-y-4 md:space-y-0 md:space-x-4">
+          <div>
+            <label className="block mb-1 font-medium">開始日</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="border px-3 py-2 rounded w-full"
+            />
+          </div>
+          <div>
+            <label className="block mb-1 font-medium">終了日</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="border px-3 py-2 rounded w-full"
+            />
+          </div>
+          <button
+            onClick={handleShowAllHistoriesInRange}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          >
+            指定範囲の全履歴を表示
+          </button>
+        </div>
+      </div>
+
+      {/* 試薬一覧テーブル (印刷時に非表示) */}
       <div className="hide-on-print">
         <table className="border-collapse w-full sm:w-3/4 lg:w-1/2 mx-auto mb-8 shadow-md">
           <thead>
@@ -138,8 +299,8 @@ export default function HistoryPage() {
         </table>
       </div>
 
-      {/* ▼ 履歴表示部分 */}
-      {selectedProductNumber && (
+      {/* ▼ viewMode==="individual" && 個別試薬が選択されているとき */}
+      {viewMode === "individual" && selectedProductNumber && (
         <div ref={historyContainerRef} className="max-w-4xl mx-auto">
           <h2 className="text-2xl font-bold mb-4">
             {selectedReagentName} の履歴情報
@@ -154,7 +315,6 @@ export default function HistoryPage() {
                   <p className="text-sm">
                     日付: {h.date?.toDate().toLocaleString() || ""}
                   </p>
-    
                   {/* actionTypeごとに表示切り替え */}
                   {h.actionType === "inbound" && (
                     <>
@@ -170,24 +330,83 @@ export default function HistoryPage() {
                   )}
                   {h.actionType === "update" && (
                     <>
-                      {/* 誰が編集したか */}
                       <p className="text-sm">編集者: {h.user || "不明"}</p>
-                      {/* oldStock/newStock などを表示 */}
                       <p className="text-sm">
                         在庫: {h.oldStock} → {h.newStock}
                       </p>
                       <p className="text-sm">
-                      月末残量: {h.oldValueStock ?? 0} → {h.newValueStock ?? 0}
+                        月末残量: {h.oldValueStock ?? 0} →{" "}
+                        {h.newValueStock ?? 0}
                       </p>
                       <p className="text-sm">試薬情報の編集</p>
-                      </>
+                    </>
                   )}
                 </div>
               ))}
             </div>
           )}
 
-          {/* ▼ 「印刷」ボタン自体も印刷したくないので hide-on-print を付与 */}
+          {/* 印刷ボタン (個別履歴) */}
+          <div className="mt-4 hide-on-print">
+            <button
+              onClick={() => window.print()}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              印刷
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ▼ viewMode==="range" && rangeHistoriesがあるとき */}
+      {viewMode === "range" && rangeHistories.length > 0 && (
+        <div ref={rangeContainerRef} className="max-w-4xl mx-auto mt-12">
+          <h2 className="text-2xl font-bold mb-4">
+            {formatDateString(startDate)} 〜 {formatDateString(endDate)} の全履歴一覧
+          </h2>
+
+          {rangeHistories.map((group) => (
+            <div key={group.productNumber} className="mb-8">
+              <h3 className="text-xl font-semibold mb-2">
+                {group.reagentName}
+              </h3>
+              {group.records.map((h) => (
+                <div key={h.id} className="border-b py-4">
+                  <p className="text-sm">
+                    日付: {h.date?.toDate().toLocaleString() || ""}
+                  </p>
+                  {/* actionTypeごとに表示切り替え */}
+                  {h.actionType === "inbound" && (
+                    <>
+                      <p className="text-sm">ロット番号: {h.lotNumber}</p>
+                      <p className="text-sm">入庫</p>
+                    </>
+                  )}
+                  {h.actionType === "outbound" && (
+                    <>
+                      <p className="text-sm">ロット番号: {h.lotNumber}</p>
+                      <p className="text-sm">出庫</p>
+                    </>
+                  )}
+                  {h.actionType === "update" && (
+                    <>
+                      <p className="text-sm">編集者: {h.user || "不明"}</p>
+                      <p className="text-sm">
+                        在庫: {h.oldStock} → {h.newStock}
+                      </p>
+                      <p className="text-sm">
+                        月末残量: {h.oldValueStock ?? 0} →{" "}
+                        {h.newValueStock ?? 0}
+                      </p>
+                      <p className="text-sm">試薬情報の編集</p>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+
+          {/* 印刷ボタン (範囲検索結果) */}
           <div className="mt-4 hide-on-print">
             <button
               onClick={() => window.print()}

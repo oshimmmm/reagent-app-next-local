@@ -23,7 +23,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   return (
     <>
       {user && (
-        <div className="fixed top-0 left-0 w-full z-50 h-16">
+        <div className="fixed top-0 left-0 w-full z-50 h-16 hide-on-print">
           <Header />
         </div>
       )}

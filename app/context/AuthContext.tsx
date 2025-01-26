@@ -9,6 +9,8 @@ import {
   onAuthStateChanged,
   signOut,
   User as FirebaseUser,
+  setPersistence,
+  browserSessionPersistence,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 
@@ -101,6 +103,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       const userData = userSnap.data();
       const email = userData.email; // たとえば "oshima@example.com" など
+
+      // 2) 「ブラウザを閉じるとログアウト」するようsessionにする
+      await setPersistence(auth, browserSessionPersistence);
 
       // 3) 取得したemail + password で Firebase Auth にログイン
       await signInWithEmailAndPassword(auth, email, password);
