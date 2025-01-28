@@ -1,7 +1,7 @@
-// app/layout.tsx (サーバーコンポーネント)
+// app/layout.tsx
 import { Metadata } from "next";
 import "./globals.css";
-import ClientLayout from "./ClientLayout"; // ← クライアントコンポーネント
+import Providers from "./Providers";
 
 export const metadata: Metadata = {
   title: "Reagent Management App",
@@ -16,13 +16,12 @@ export default function RootLayout({
     <html lang="ja">
       <body className="pt-16">
         {/* 
-          layout.tsx はサーバーコンポーネントなので 
-          ここでは直接 useAuth() は使わず、
-          クライアントコンポーネントに委譲する
+          layout.tsx はサーバーコンポーネント
+          ここで Provider を呼び出すときは client component が必要
         */}
-        <ClientLayout>
+        <Providers>
           {children}
-        </ClientLayout>
+        </Providers>
       </body>
     </html>
   );

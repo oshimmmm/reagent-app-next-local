@@ -1,71 +1,60 @@
 "use client";
-import { useEffect, useState } from "react";
-import {
-  collection,
-  getDocs,
-  Timestamp,
-} from "firebase/firestore";
-import { useAuth } from "../context/AuthContext";
-import { db } from "../utils/firebase";
 
-// Firestore の生データ用
-interface ReagentDataFromFirestore {
-  currentLot?: string;
-  maxExpiry?: Timestamp;  // タイムスタンプ
-  name?: string;
-  noOrderOnZeroStock?: boolean;
-  orderDate?: Timestamp | null; // null もあり
-  orderTriggerExpiry?: boolean;
-  orderTriggerStock?: number;
-  orderTriggerValueStock?: number | null;
-  stock?: number;
-  valueStock?: number;
-  orderValue?: string; //物流コード
-  monthlyRemaining?: number;
-  orderQuantity?: number; // 発注数
-  location?: string;
+import { useEffect, useState } from "react";
+
+// =========================
+// データベース(Reagent)から取得する型 (DB直後の生データ)
+// =========================
+interface ReagentFromDB {
+  id: number;                       // DBがInt主キーなら
+  productNumber: string;
+  currentLot: string | null;
+  location: string | null;
+  maxExpiry: string | null;        // Prisma JSON化で ISO8601文字列になる場合が多い
+  name: string | null;
+  noOrderOnZeroStock: boolean;
+  orderDate: string | null;
+  orderQuantity: number;
+  orderTriggerExpiry: boolean;
+  orderTriggerStock: number;
+  orderTriggerValueStock: number | null;
+  orderValue: string | null;
+  stock: number;
+  valueStock: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
-// コンポーネント内で使う型 (フォーマット後のもの)
+// =========================
+// フロント用に整形した型 (UI表示のため、nullを除去しやすくする等)
+// =========================
 interface Reagent {
   productNumber: string;
   name: string;
   stock: number;
-  maxExpiry: string; // 文字列
+  maxExpiry: string;       // "YYYY-MM-DD" 等
   currentLot: string;
   noOrderOnZeroStock: boolean;
-  orderDate: string; // 文字列
+  orderDate: string;       // "YYYY-MM-DD" 等
   orderTriggerExpiry: boolean;
   orderTriggerStock: number;
   orderTriggerValueStock: number | null;
   valueStock: number;
-  location: string;
   orderValue: string;
-  monthlyRemaining: number;
   orderQuantity: number;
-  orderStatus: string; // "発注" or ""
+  orderStatus: string;     // "発注" or ""
+  location: string;
 }
 
-// Timestamp または null を日付文字列に変換
-function formatTimestamp(value: Timestamp | string | null | undefined): string {
-  if (!value) {
-    // null や undefined のとき
-    return "";
-  }
-
-  if (value instanceof Timestamp) {
-    // 本当に Firestore の Timestamp 型なら toDate() が使える
-    return value.toDate().toISOString().split("T")[0];
-  }
-
-  // 文字列の場合はそのまま返す or パースして返す
-  if (typeof value === "string") {
-    // 例: "2025-01-01" 形式を想定しているなら、そのまま返すか Date に変換
-    return value; 
-  }
-
-  // それ以外の型は想定外なので空文字を返すなど適宜調整
-  return "";
+// =========================
+// 日付文字列(ISO8601など)を "YYYY-MM-DD" に整形
+// =========================
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "";
+  // new Date()でパースしてYYYY-MM-DDに変換
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return ""; // パース失敗
+  return d.toISOString().split("T")[0];
 }
 
 /**
@@ -82,7 +71,7 @@ function checkOrderStatus(
 ): string {
   let needOrder = false;
 
-  // 1) 在庫が0でも発注しない場合のロジック
+  // 1) 在庫が0でも発注しない設定 (noOrderOnZeroStock)
   if (noOrderOnZeroStock) {
     if (
       orderTriggerValueStock !== null &&
@@ -97,9 +86,9 @@ function checkOrderStatus(
     }
   }
 
-  // 2) 最長使用期限による発注条件
+  // 2) 使用期限による発注条件
   if (orderTriggerExpiry && maxExpiryStr) {
-    const expiryDate = new Date(maxExpiryStr); 
+    const expiryDate = new Date(maxExpiryStr);
     const now = new Date();
     const oneMonthLater = new Date();
     oneMonthLater.setMonth(now.getMonth() + 1);
@@ -112,80 +101,77 @@ function checkOrderStatus(
 }
 
 export default function HomePage() {
-  const { user, loading } = useAuth();
   const [reagents, setReagents] = useState<Reagent[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+
+  // ソート・フィルタ用の state (従来通り)
   const [sortConfig, setSortConfig] = useState<{ key: keyof Reagent; direction: 'asc' | 'desc' } | null>(null);
   const [selectedFilters, setSelectedFilters] = useState<{ [key in keyof Reagent]?: string }>({});
 
-  useEffect(() => {
-    // 未ログインならリダイレクトなどがある場合はここで
-    if (!loading && !user) {
-      // ...
-    }
-  }, [loading, user]);
-
+  // =========================
+  // 1) DBからreagentsを取得
+  // =========================
   useEffect(() => {
     const fetchReagents = async () => {
       setLoadingData(true);
 
-      const colRef = collection(db, "reagents");
-      const snapshot = await getDocs(colRef);
+      try {
+        const res = await fetch("/api/reagents");
+        if (!res.ok) {
+          throw new Error("Failed to fetch reagents");
+        }
+        const dbData: ReagentFromDB[] = await res.json();
 
-      const dataList: Reagent[] = [];
-      snapshot.forEach((docSnap) => {
-        // Firestoreの生データ
-        const data = docSnap.data() as ReagentDataFromFirestore;
+        // 取得したデータをUI用に整形
+        const dataList: Reagent[] = dbData.map((item) => {
+          const maxExpiryStr = formatDate(item.maxExpiry);
+          const orderDateStr = formatDate(item.orderDate);
 
-        // 文字列に変換した maxExpiry
-        const maxExpiryStr = data.maxExpiry
-          ? formatTimestamp(data.maxExpiry)
-          : "";
+          // 発注可否判定
+          const status = checkOrderStatus(
+            item.stock ?? 0,
+            maxExpiryStr,
+            item.orderTriggerStock ?? 0,
+            item.orderTriggerExpiry ?? false,
+            item.noOrderOnZeroStock ?? false,
+            item.valueStock ?? 0,
+            item.orderTriggerValueStock ?? null
+          );
 
-        // 文字列に変換した orderDate
-        const orderDateStr = data.orderDate
-          ? formatTimestamp(data.orderDate)
-          : "";
-
-        // 発注可否を判定
-        const status = checkOrderStatus(
-          data.stock ?? 0,
-          maxExpiryStr,
-          data.orderTriggerStock ?? 0,
-          data.orderTriggerExpiry ?? false,
-          data.noOrderOnZeroStock ?? false,
-          data.valueStock ?? 0,
-          data.orderTriggerValueStock ?? null
-        );
-
-        dataList.push({
-          productNumber: docSnap.id,
-          name: data.name ?? "",
-          stock: data.stock ?? 0,
-          maxExpiry: maxExpiryStr,
-          currentLot: data.currentLot ?? "",
-          noOrderOnZeroStock: data.noOrderOnZeroStock ?? false,
-          orderDate: orderDateStr,
-          orderTriggerExpiry: data.orderTriggerExpiry ?? false,
-          orderTriggerStock: data.orderTriggerStock ?? 0,
-          orderTriggerValueStock: data.orderTriggerValueStock ?? null,
-          valueStock: data.valueStock ?? 0,
-          orderValue: data.orderValue ?? "",
-          monthlyRemaining: data.monthlyRemaining ?? 0,
-          orderQuantity: data.orderQuantity ?? 0,
-          orderStatus: status,
-          location: data.location ?? "",
+          return {
+            productNumber: item.productNumber,
+            name: item.name ?? "",
+            stock: item.stock ?? 0,
+            maxExpiry: maxExpiryStr,
+            currentLot: item.currentLot ?? "",
+            noOrderOnZeroStock: item.noOrderOnZeroStock,
+            orderDate: orderDateStr,
+            orderTriggerExpiry: item.orderTriggerExpiry,
+            orderTriggerStock: item.orderTriggerStock,
+            orderTriggerValueStock: item.orderTriggerValueStock,
+            valueStock: item.valueStock,
+            orderValue: item.orderValue ?? "",
+            orderQuantity: item.orderQuantity,
+            orderStatus: status,
+            location: item.location ?? "",
+          };
         });
-        console.log("dataList is:", dataList);
-      });
 
-      setReagents(dataList);
-      setLoadingData(false);
+        setReagents(dataList);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoadingData(false);
+      }
     };
 
     fetchReagents();
   }, []);
 
+
+  // =========================
+  // ソート機能
+  // =========================
   const requestSort = (key: keyof Reagent) => {
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -201,48 +187,55 @@ export default function HomePage() {
     return {};
   };
 
+  // =========================
+  // フィルタ機能
+  // =========================
   const handleFilterChange = (key: keyof Reagent, value: string) => {
     setSelectedFilters((prev) => ({
       ...prev,
-      [key]: value || undefined, // 空値は undefined に設定
+      [key]: value || undefined, // 空は undefined に
     }));
   };
-  
-  
+
+  // 抽出可能な値のリストを作る
   const uniqueValues: { [key in keyof Reagent]?: string[] } = reagents.reduce((acc, reagent) => {
-    Object.keys(reagent).forEach((key) => {
-      const typedKey = key as keyof Reagent;
-      if (!acc[typedKey]) {
-        acc[typedKey] = [];
+    (Object.keys(reagent) as (keyof Reagent)[]).forEach((key) => {
+      if (!acc[key]) {
+        acc[key] = [];
       }
-      if (reagent[typedKey] && !acc[typedKey]?.includes(String(reagent[typedKey]))) {
-        acc[typedKey]!.push(String(reagent[typedKey]));
+      const val = String(reagent[key] ?? "");
+      if (val && !acc[key]!.includes(val)) {
+        acc[key]!.push(val);
       }
     });
     return acc;
   }, {} as { [key in keyof Reagent]?: string[] });
 
+  // =========================
+  // フィルタ + ソート
+  // =========================
   const filteredAndSortedReagents = reagents
-  .filter((reagent) =>
-    Object.entries(selectedFilters).every(([key, value]) =>
-      value ? String(reagent[key as keyof Reagent]).includes(value) : true
+    .filter((reagent) =>
+      Object.entries(selectedFilters).every(([key, value]) =>
+        value ? String(reagent[key as keyof Reagent]).includes(value) : true
+      )
     )
-  )
-  .sort((a, b) => {
-    if (!sortConfig) return 0;
-  
-    const aValue = (a[sortConfig.key] || '').toString().toLowerCase(); // 小文字に変換
-    const bValue = (b[sortConfig.key] || '').toString().toLowerCase(); // 小文字に変換
-  
-    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-    return 0;
-  });
+    .sort((a, b) => {
+      if (!sortConfig) return 0;
+
+      const aValue = (a[sortConfig.key] || '').toString().toLowerCase();
+      const bValue = (b[sortConfig.key] || '').toString().toLowerCase();
+
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
 
 
   return (
     <div className="container mx-auto px-4">
-      <h1 className="text-2xl font-bold my-4">ホーム</h1>
+      <h1 className="text-2xl font-bold my-4">ホーム (Prisma版)</h1>
+
       {loadingData ? (
         <p>読み込み中...</p>
       ) : (
@@ -252,8 +245,8 @@ export default function HomePage() {
               <th className="p-2 border">
                 <div
                   onClick={() => requestSort('name')}
-                  style={{ ...getHeaderStyle('name') }}
-                  className='text-lg cursor-pointer'
+                  style={getHeaderStyle('name')}
+                  className="text-lg cursor-pointer"
                 >
                   試薬名
                 </div>
@@ -279,8 +272,8 @@ export default function HomePage() {
               <th className="p-2 border">
                 <div
                   onClick={() => requestSort('location')}
-                  style={{ ...getHeaderStyle('location') }}
-                  className='text-lg cursor-pointer'
+                  style={getHeaderStyle('location')}
+                  className="text-lg cursor-pointer"
                 >
                   保管場所
                 </div>
@@ -308,10 +301,12 @@ export default function HomePage() {
                 <td className="p-2 border">{r.stock}</td>
                 <td className="p-2 border">{r.currentLot}</td>
                 <td className="p-2 border">{r.maxExpiry}</td>
-                <td className="p-2 border">{r.valueStock !== undefined && r.valueStock !== 0 ? r.valueStock : ""}</td>
+                <td className="p-2 border">
+                  {r.valueStock !== undefined && r.valueStock !== 0 ? r.valueStock : ""}
+                </td>
                 <td className="p-2 border">{r.orderStatus}</td>
                 <td className="p-2 border">{r.orderQuantity}</td>
-                <td className="p-2 border"> {r.location} </td>
+                <td className="p-2 border">{r.location}</td>
                 <td className="p-2 border">{r.orderValue}</td>
                 <td className="p-2 border">{r.orderDate}</td>
               </tr>

@@ -1,16 +1,19 @@
-// components/Header.tsx
 "use client";
 
 import Link from "next/link";
-import { useAuth } from "../context/AuthContext";
+import { signOut, useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 
 export default function Header() {
-  const { user, logout } = useAuth();
+  const { data: session } = useSession();
   const pathname = usePathname(); // 現在のパスを取得
 
   // ログインしていない場合はヘッダー非表示
-  if (!user) return null;
+  if (!session?.user) return null;
+
+  // NextAuth session.user の構造
+  const user = session.user; 
+  // signOut() は next-auth/react から提供される
 
   // 一般ユーザーが見るリンク
   const commonLinks = [
@@ -23,12 +26,11 @@ export default function Header() {
   ];
 
   // 管理者ユーザーのみ表示したいリンクを追加
-  // 「ユーザー管理」へのリンクを追加
   const adminLinks = [
     ...commonLinks,
     { path: "/manage", label: "試薬情報編集" },
     { path: "/archive", label: "アーカイブ" },
-    { path: "/user", label: "ユーザー管理" }, // ← 追加
+    { path: "/user", label: "ユーザー管理" },
   ];
 
   // 管理者なら adminLinks、それ以外なら commonLinks
@@ -60,7 +62,7 @@ export default function Header() {
             {user.username} さん
           </span>
           <button
-            onClick={logout}
+            onClick={() => signOut({ callbackUrl: "/login" })}
             className="bg-red-500 hover:bg-red-600 text-white text-sm font-medium px-4 py-2 rounded"
           >
             ログアウト
