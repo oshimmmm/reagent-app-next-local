@@ -133,45 +133,40 @@ function migrateReagents(firestore) {
 }
 function migrateHistories(firestore) {
     return __awaiter(this, void 0, void 0, function () {
-        var snapshot, _i, _a, doc, data, actionType, date, lotNumber, productNumber, dateVal, reagent;
+        var snapshot, _i, _a, doc, data, actionType, date, lotNumber, productNumber, user, oldStock, newStock, oldValueStock, newValueStock, dateVal;
         return __generator(this, function (_b) {
             switch (_b.label) {
-                case 0: return [4 /*yield*/, firestore.collection('histories').get()];
+                case 0: return [4 /*yield*/, firestore.collection("histories").get()];
                 case 1:
                     snapshot = _b.sent();
                     _i = 0, _a = snapshot.docs;
                     _b.label = 2;
                 case 2:
-                    if (!(_i < _a.length)) return [3 /*break*/, 6];
+                    if (!(_i < _a.length)) return [3 /*break*/, 5];
                     doc = _a[_i];
                     data = doc.data();
-                    actionType = data.actionType, date = data.date, lotNumber = data.lotNumber, productNumber = data.productNumber;
+                    actionType = data.actionType, date = data.date, lotNumber = data.lotNumber, productNumber = data.productNumber, user = data.user, oldStock = data.oldStock, newStock = data.newStock, oldValueStock = data.oldValueStock, newValueStock = data.newValueStock;
                     dateVal = date ? date.toDate() : new Date();
-                    return [4 /*yield*/, prisma.reagent.findUnique({
-                            where: { productNumber: productNumber },
-                        })
-                        // PostgreSQLへINSERT
-                    ];
-                case 3:
-                    reagent = _b.sent();
-                    // PostgreSQLへINSERT
                     return [4 /*yield*/, prisma.history.create({
                             data: {
-                                actionType: actionType || '',
+                                actionType: actionType || "",
                                 date: dateVal,
-                                lotNumber: lotNumber || '',
-                                productNumber: productNumber || '',
-                                reagentId: reagent === null || reagent === void 0 ? void 0 : reagent.id, // リレーション確立
+                                lotNumber: lotNumber || "",
+                                productNumber: productNumber || "",
+                                user: user !== null && user !== void 0 ? user : null,
+                                oldStock: oldStock !== null && oldStock !== void 0 ? oldStock : null,
+                                newStock: newStock !== null && newStock !== void 0 ? newStock : null,
+                                oldValueStock: oldValueStock !== null && oldValueStock !== void 0 ? oldValueStock : null,
+                                newValueStock: newValueStock !== null && newValueStock !== void 0 ? newValueStock : null,
                             },
                         })];
-                case 4:
-                    // PostgreSQLへINSERT
+                case 3:
                     _b.sent();
-                    _b.label = 5;
-                case 5:
+                    _b.label = 4;
+                case 4:
                     _i++;
                     return [3 /*break*/, 2];
-                case 6:
+                case 5:
                     console.log("Histories migrated: ".concat(snapshot.size));
                     return [2 /*return*/];
             }

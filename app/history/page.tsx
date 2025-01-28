@@ -1,27 +1,22 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import {
-  collection,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  Timestamp,
-} from "firebase/firestore";
-import { db } from "../utils/firebase";
+import { parseISO, format } from "date-fns"; 
+// 例: 日付フォーマットにdate-fnsを使う。もちろんtoLocaleString()でもOK
 
+/** DBで管理する試薬 */
 interface Reagent {
   productNumber: string;
   name: string;
 }
 
+/** 履歴レコード (Prisma側) */
 interface HistoryRecord {
-  id: string;
+  id: number;              // Prismaでautoincrement()の場合
   productNumber: string;
   lotNumber: string;
   actionType: "inbound" | "outbound" | "update";
-  date?: Timestamp;
+  date: string;            // ISO文字列として受け取る
   user?: string;
   oldStock?: number;
   newStock?: number;
@@ -29,14 +24,14 @@ interface HistoryRecord {
   newValueStock?: number;
 }
 
-/** 履歴を「productNumberごと」にまとめたいので、グループ用の型を定義 */
+/** グループ用 */
 interface GroupedHistory {
   productNumber: string;
-  reagentName: string; // 見やすいように試薬名も含める
-  records: HistoryRecord[]; // その製品番号に属する履歴の配列
+  reagentName: string; 
+  records: HistoryRecord[];
 }
 
-// ▼ viewMode というステートで、個別表示か範囲表示かを管理する
+// 表示モード
 type ViewMode = "none" | "individual" | "range";
 
 export default function HistoryPage() {
@@ -45,46 +40,47 @@ export default function HistoryPage() {
   const [selectedReagentName, setSelectedReagentName] = useState("");
   const [histories, setHistories] = useState<HistoryRecord[]>([]);
 
-  // ▼ 日付範囲指定用
-  const [startDate, setStartDate] = useState(""); // 例: "2025-01-01"
-  const [endDate, setEndDate] = useState("");     // 例: "2025-01-31"
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [rangeHistories, setRangeHistories] = useState<GroupedHistory[]>([]);
 
-  // ▼ 表示モード ("none" | "individual" | "range")
   const [viewMode, setViewMode] = useState<ViewMode>("none");
 
-  // ▼ 個別履歴表示領域
   const historyContainerRef = useRef<HTMLDivElement>(null);
-
-  // ▼ 範囲検索結果表示領域
   const rangeContainerRef = useRef<HTMLDivElement>(null);
 
   // ------------------
-  // 初回に試薬一覧を取得
+  // 1) 試薬一覧取得 (productNumber, name)
   // ------------------
   useEffect(() => {
     const fetchReagents = async () => {
-      const reagentsRef = collection(db, "reagents");
-      const snapshot = await getDocs(reagentsRef);
-      const list: Reagent[] = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        list.push({
-          productNumber: docSnap.id,
-          name: data.name || "",
-        });
-      });
-      setReagents(list);
+      try {
+        // 例: /api/reagents (GET) で全レコード取得 → ID, name
+        const res = await fetch("/api/reagents");
+        if (!res.ok) throw new Error("Failed to fetch reagents");
+        const data: any[] = await res.json();
+
+        // data から Reagent[] を組み立て
+        // Prismaの Reagentモデルを想定
+        // { id: number, productNumber: string, name: string | null, ... } とか
+        const list: Reagent[] = data.map((r) => ({
+          productNumber: r.productNumber,
+          name: r.name ?? "",
+        }));
+        setReagents(list);
+      } catch (error) {
+        console.error(error);
+        alert("試薬一覧の取得に失敗しました。");
+      }
     };
     fetchReagents();
   }, []);
 
   // ------------------
-  // (2) rangeHistories がセットされたらスクロール
+  // 2) rangeHistoriesがセットされたらスクロール
   // ------------------
   useEffect(() => {
     if (viewMode === "range" && rangeHistories.length > 0) {
-      // 次のtickでスクロール
       setTimeout(() => {
         rangeContainerRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 0);
@@ -92,73 +88,47 @@ export default function HistoryPage() {
   }, [viewMode, rangeHistories]);
 
   // ------------------
-  // 1) 個別試薬の履歴表示
+  // 個別履歴表示
   // ------------------
   const handleShowHistory = async (productNumber: string) => {
-    // ビューを「個別表示」に切り替え
     setViewMode("individual");
-
-    // 範囲検索の結果をクリアしておく
     setRangeHistories([]);
 
-    // 選択された試薬名を表示するため
     const reagent = reagents.find((r) => r.productNumber === productNumber);
     setSelectedReagentName(reagent?.name || "");
     setSelectedProductNumber(productNumber);
 
-    // histories 取得
-    const historiesRef = collection(db, "histories");
-    const qHistories = query(
-      historiesRef,
-      where("productNumber", "==", productNumber),
-      orderBy("date", "desc")
-    );
-    const snapshot = await getDocs(qHistories);
+    try {
+      // /api/histories/[productNumber]?order=desc などで履歴を取得
+      const res = await fetch(`/api/histories/${encodeURIComponent(productNumber)}?order=desc`);
+      if (!res.ok) throw new Error("履歴取得に失敗しました");
+      const list: HistoryRecord[] = await res.json();
+      setHistories(list);
 
-    const list: HistoryRecord[] = [];
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      list.push({
-        id: docSnap.id,
-        productNumber: data.productNumber,
-        lotNumber: data.lotNumber,
-        actionType: data.actionType,
-        date: data.date,
-        user: data.user,
-        oldStock: data.oldStock,
-        newStock: data.newStock,
-        oldValueStock: data.oldValueStock,
-        newValueStock: data.newValueStock,
-      });
-    });
-    setHistories(list);
+      // スクロール
+      setTimeout(() => {
+        historyContainerRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 0);
 
-    // スクロール
-    setTimeout(() => {
-      if (historyContainerRef.current) {
-        historyContainerRef.current.scrollIntoView({ behavior: "smooth" });
-      }
-    }, 0);
+    } catch (error) {
+      console.error(error);
+      alert("個別履歴の取得に失敗しました。");
+    }
   };
 
   // ------------------
-  // 2) 日付範囲の全履歴
+  // 日付範囲指定の全履歴表示
   // ------------------
   const handleShowAllHistoriesInRange = async () => {
-    // ビューを「範囲検索」に切り替え
     setViewMode("range");
-
-    // 個別選択の結果をクリアしておく
     setSelectedProductNumber("");
     setSelectedReagentName("");
     setHistories([]);
 
-    // 日付チェック
     if (!startDate || !endDate) {
       alert("開始日と終了日を指定してください。");
       return;
     }
-
     const start = new Date(`${startDate}T00:00:00`);
     const end = new Date(`${endDate}T23:59:59`);
     if (start > end) {
@@ -167,31 +137,12 @@ export default function HistoryPage() {
     }
 
     try {
-      const historiesRef = collection(db, "histories");
-      const qHistories = query(
-        historiesRef,
-        where("date", ">=", start),
-        where("date", "<=", end),
-        orderBy("date", "desc")
-      );
-      const snapshot = await getDocs(qHistories);
+      // /api/histories?start=YYYY-MM-DD&end=YYYY-MM-DD
+      const query = new URLSearchParams({ start: startDate, end: endDate });
+      const res = await fetch(`/api/histories/range?${query.toString()}`);
+      if (!res.ok) throw new Error("範囲検索に失敗しました");
 
-      const list: HistoryRecord[] = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        list.push({
-          id: docSnap.id,
-          productNumber: data.productNumber,
-          lotNumber: data.lotNumber,
-          actionType: data.actionType,
-          date: data.date,
-          user: data.user,
-          oldStock: data.oldStock,
-          newStock: data.newStock,
-          oldValueStock: data.oldValueStock,
-          newValueStock: data.newValueStock,
-        });
-      });
+      const list: HistoryRecord[] = await res.json();
 
       // グループ化
       const map = new Map<string, HistoryRecord[]>();
@@ -204,10 +155,9 @@ export default function HistoryPage() {
       const grouped: GroupedHistory[] = [];
       map.forEach((records, productNumber) => {
         const reagent = reagents.find((r) => r.productNumber === productNumber);
-        const reagentName = reagent?.name || "不明な試薬";
         grouped.push({
           productNumber,
-          reagentName,
+          reagentName: reagent?.name || "不明な試薬",
           records,
         });
       });
@@ -215,27 +165,23 @@ export default function HistoryPage() {
       setRangeHistories(grouped);
 
     } catch (error) {
-      console.error("範囲検索エラー:", error);
+      console.error(error);
       alert("範囲検索中にエラーが発生しました。");
     }
   };
 
-  // ▼ 日付フォーマット関数の例
-  function formatDateString(ymd: string): string {
-    if (!ymd) return "";
-    const [yyyy, mm, dd] = ymd.split("-");
-    if (!yyyy || !mm || !dd) return "";
-    return `${yyyy}年${mm}月${dd}日`;
+  function formatDateStr(iso: string): string {
+    if (!iso) return "";
+    // parseISO(iso) → date-fnsでformat
+    const d = parseISO(iso);
+    return format(d, "yyyy/MM/dd HH:mm:ss");
   }
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* 見出し(印刷時に非表示) */}
-      <h1 className="text-3xl font-bold text-center mb-8 hide-on-print">
-        履歴管理
-      </h1>
+      <h1 className="text-3xl font-bold text-center mb-8 hide-on-print">履歴管理 (Prisma版)</h1>
 
-      {/* 日付範囲の指定フォーム + ボタン */}
+      {/* 日付範囲 フォーム */}
       <div className="hide-on-print max-w-xl mx-auto mb-8">
         <div className="flex flex-col md:flex-row items-end space-y-4 md:space-y-0 md:space-x-4">
           <div>
@@ -265,7 +211,7 @@ export default function HistoryPage() {
         </div>
       </div>
 
-      {/* 試薬一覧テーブル (印刷時に非表示) */}
+      {/* 試薬一覧テーブル */}
       <div className="hide-on-print">
         <table className="border-collapse w-full sm:w-3/4 lg:w-1/2 mx-auto mb-8 shadow-md">
           <thead>
@@ -299,13 +245,12 @@ export default function HistoryPage() {
         </table>
       </div>
 
-      {/* ▼ viewMode==="individual" && 個別試薬が選択されているとき */}
+      {/* 個別履歴 */}
       {viewMode === "individual" && selectedProductNumber && (
         <div ref={historyContainerRef} className="max-w-4xl mx-auto">
           <h2 className="text-2xl font-bold mb-4">
             {selectedReagentName} の履歴情報
           </h2>
-
           {histories.length === 0 ? (
             <p>履歴がありません。</p>
           ) : (
@@ -313,9 +258,8 @@ export default function HistoryPage() {
               {histories.map((h) => (
                 <div key={h.id} className="border-b py-4">
                   <p className="text-sm">
-                    日付: {h.date?.toDate().toLocaleString() || ""}
+                    日付: {formatDateStr(h.date)}
                   </p>
-                  {/* actionTypeごとに表示切り替え */}
                   {h.actionType === "inbound" && (
                     <>
                       <p className="text-sm">ロット番号: {h.lotNumber}</p>
@@ -335,8 +279,7 @@ export default function HistoryPage() {
                         在庫: {h.oldStock} → {h.newStock}
                       </p>
                       <p className="text-sm">
-                        月末残量: {h.oldValueStock ?? 0} →{" "}
-                        {h.newValueStock ?? 0}
+                        月末残量: {h.oldValueStock ?? 0} → {h.newValueStock ?? 0}
                       </p>
                       <p className="text-sm">試薬情報の編集</p>
                     </>
@@ -345,8 +288,6 @@ export default function HistoryPage() {
               ))}
             </div>
           )}
-
-          {/* 印刷ボタン (個別履歴) */}
           <div className="mt-4 hide-on-print">
             <button
               onClick={() => window.print()}
@@ -358,13 +299,12 @@ export default function HistoryPage() {
         </div>
       )}
 
-      {/* ▼ viewMode==="range" && rangeHistoriesがあるとき */}
+      {/* 範囲検索結果 */}
       {viewMode === "range" && rangeHistories.length > 0 && (
         <div ref={rangeContainerRef} className="max-w-4xl mx-auto mt-12">
           <h2 className="text-2xl font-bold mb-4">
-            {formatDateString(startDate)} 〜 {formatDateString(endDate)} の全履歴一覧
+            {startDate} ~ {endDate} の全履歴一覧
           </h2>
-
           {rangeHistories.map((group) => (
             <div key={group.productNumber} className="mb-8">
               <h3 className="text-xl font-semibold mb-2">
@@ -372,10 +312,7 @@ export default function HistoryPage() {
               </h3>
               {group.records.map((h) => (
                 <div key={h.id} className="border-b py-4">
-                  <p className="text-sm">
-                    日付: {h.date?.toDate().toLocaleString() || ""}
-                  </p>
-                  {/* actionTypeごとに表示切り替え */}
+                  <p className="text-sm">日付: {formatDateStr(h.date)}</p>
                   {h.actionType === "inbound" && (
                     <>
                       <p className="text-sm">ロット番号: {h.lotNumber}</p>
@@ -395,8 +332,7 @@ export default function HistoryPage() {
                         在庫: {h.oldStock} → {h.newStock}
                       </p>
                       <p className="text-sm">
-                        月末残量: {h.oldValueStock ?? 0} →{" "}
-                        {h.newValueStock ?? 0}
+                        月末残量: {h.oldValueStock ?? 0} → {h.newValueStock ?? 0}
                       </p>
                       <p className="text-sm">試薬情報の編集</p>
                     </>
@@ -405,8 +341,6 @@ export default function HistoryPage() {
               ))}
             </div>
           ))}
-
-          {/* 印刷ボタン (範囲検索結果) */}
           <div className="mt-4 hide-on-print">
             <button
               onClick={() => window.print()}

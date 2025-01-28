@@ -46,6 +46,11 @@ model History {
   date          DateTime
   lotNumber     String
   productNumber String      // Firebaseで格納していた値を保持
+  user          String?   // [追加]
+  oldStock      Int?      // [追加]
+  newStock      Int?      // [追加]
+  oldValueStock Int?      // [追加]
+  newValueStock Int?      // [追加]
 
   // Reagentとの関係 (外部キー: reagentId) 
   // → productNumber自体でJOINするパターンも可能だが、よくあるRDB設計ではID参照が一般的

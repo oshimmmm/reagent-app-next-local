@@ -1,18 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import {
-  doc,
-  getDoc,
-  updateDoc,
-  collection,
-  addDoc,
-  serverTimestamp,
-  getDocs,
-} from "firebase/firestore";
 import { parseCode } from "../libs/parseCode";
 import { parseNoGCode } from "../libs/parseNoGCode";
-import { db } from "../utils/firebase";
+
+// Firestore関連を削除し、Prisma+Postgresは API Route を呼び出す形に変更
 
 export default function OutboundPage() {
   const [scanValue, setScanValue] = useState("");
@@ -21,47 +13,36 @@ export default function OutboundPage() {
 
   // 手入力用
   const [alphabetDocs, setAlphabetDocs] = useState<{ id: string; name: string }[]>([]);
-  const [selectedDocId, setSelectedDocId] = useState<string>("");  // 選択した docID
-  const [manualLot, setManualLot] = useState<string>("");          // 手入力ロット番号
+  const [selectedDocId, setSelectedDocId] = useState<string>("");  
+  const [manualLot, setManualLot] = useState<string>("");  
 
-  // 入力フォーカス用
+  // input要素にフォーカス
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // マウント時に input にフォーカス
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
   /**
-   * Firestore から「docID がアルファベットで始まる」ドキュメントを取得
+   * 1) 「docIDがアルファベットで始まる」Reagent一覧を取得
+   *    例: /api/reagents-alphabet から { id, name }[] をfetch
    */
   useEffect(() => {
     const fetchAlphabetDocs = async () => {
       try {
-        const snapshot = await getDocs(collection(db, "reagents"));
-        const docs: { id: string; name: string }[] = [];
-        snapshot.forEach((docSnap) => {
-          const docId = docSnap.id;
-          // アルファベット（大文字小文字区別なし）で始まる場合のみ対象
-          if (/^[A-Za-z]/.test(docId)) {
-            const data = docSnap.data() as { name?: string };
-            docs.push({
-              id: docId,
-              name: data.name ?? "",
-            });
-          }
-        });
-        setAlphabetDocs(docs);
+        const res = await fetch("/api/reagents-alphabet");
+        if (!res.ok) throw new Error("一覧取得に失敗しました");
+        const docs = await res.json();
+        setAlphabetDocs(docs); // [{ id, name }, ... ]
       } catch (error) {
         console.error(error);
-        setErrorMessage("Firestore からの取得に失敗しました。");
+        setErrorMessage("DB からの取得に失敗しました。");
       }
     };
     fetchAlphabetDocs();
   }, []);
 
   /**
-   * GS1 バーコードで出庫
+   * 2) GS1 バーコードで出庫
    */
   const handleOutbound = async () => {
     if (!scanValue) return;
@@ -76,7 +57,7 @@ export default function OutboundPage() {
   };
 
   /**
-   * Roche バーコードで出庫
+   * 3) Roche バーコードで出庫
    */
   const handleNoGOutbound = async () => {
     if (!scanNoGValue) return;
@@ -91,7 +72,7 @@ export default function OutboundPage() {
   };
 
   /**
-   * 手入力で出庫 (プルダウンで試薬選択、ロット番号入力)
+   * 4) 手入力で出庫
    */
   const handleManualOutbound = async () => {
     if (!selectedDocId) {
@@ -104,7 +85,6 @@ export default function OutboundPage() {
     }
     try {
       await commonOutboundLogic(selectedDocId, manualLot);
-      // 正常終了後リセット
       setSelectedDocId("");
       setManualLot("");
     } catch (error) {
@@ -114,39 +94,22 @@ export default function OutboundPage() {
   };
 
   /**
-   * 在庫を1減らし、currentLotを更新 → historiesにログ追加
-   * (GS1, Roche, 手入力 いずれも同じロジック)
+   * 5) 共通の出庫ロジック
+   *    - DBから在庫を1減らし、currentLotを更新
+   *    - Historyに出庫ログを追加
    */
   const commonOutboundLogic = async (productNumber: string, lotNumber: string) => {
-    const reagentRef = doc(db, "reagents", productNumber);
-    const reagentSnap = await getDoc(reagentRef);
-
-    if (!reagentSnap.exists()) {
-      throw new Error("該当する試薬が存在しません。");
-    }
-
-    const reagentData = reagentSnap.data();
-    const currentStock = reagentData?.stock || 0;
-    if (currentStock <= 0) {
-      throw new Error("在庫がありません。");
-    }
-
-    const newStock = currentStock - 1;
-
-    // 使用中ロットナンバーを更新
-    await updateDoc(reagentRef, {
-      stock: newStock,
-      currentLot: lotNumber,
+    // ここで /api/outbound にPOSTして、サーバー側(Prisma)で在庫更新 & 履歴追加を行う
+    const res = await fetch("/api/outbound", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productNumber, lotNumber }),
     });
 
-    // 出庫履歴を保存
-    const historyRef = collection(db, "histories");
-    await addDoc(historyRef, {
-      productNumber,
-      lotNumber,
-      actionType: "outbound",
-      date: serverTimestamp(),
-    });
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({}));
+      throw new Error(error || "出庫処理に失敗しました。");
+    }
 
     alert(`出庫が完了しました: [${productNumber}] ロット: ${lotNumber}`);
   };
@@ -154,7 +117,7 @@ export default function OutboundPage() {
   return (
     <div className="container mx-auto px-4 py-6">
       <h1 className="text-3xl font-bold mb-6 text-center text-indigo-700 drop-shadow-md">出庫処理</h1>
-  
+
       {/* GS1 バーコード */}
       <div className="border p-4 rounded-lg shadow-md mb-6 bg-gray-50">
         <h2 className="text-xl font-semibold mb-4">GS1 バーコードスキャン</h2>
@@ -167,9 +130,7 @@ export default function OutboundPage() {
             value={scanValue}
             onChange={(e) => setScanValue(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                handleOutbound();
-              }
+              if (e.key === "Enter") handleOutbound();
             }}
           />
           <button
@@ -180,7 +141,7 @@ export default function OutboundPage() {
           </button>
         </div>
       </div>
-  
+
       {/* Roche バーコード */}
       <div className="border p-4 rounded-lg shadow-md mb-6 bg-gray-50">
         <h2 className="text-xl font-semibold mb-4">Roche バーコードスキャン</h2>
@@ -192,9 +153,7 @@ export default function OutboundPage() {
             value={scanNoGValue}
             onChange={(e) => setScanNoGValue(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                handleNoGOutbound();
-              }
+              if (e.key === "Enter") handleNoGOutbound();
             }}
           />
           <button
@@ -205,12 +164,12 @@ export default function OutboundPage() {
           </button>
         </div>
       </div>
-  
-      {/* 手入力による出庫 */}
+
+      {/* 手入力 出庫 */}
       <div className="border p-6 rounded-lg shadow-md bg-gray-50">
         <h2 className="text-xl font-semibold mb-4">その他出庫</h2>
         <p className="mb-4 text-gray-600">
-        *GATA3, HNF4α, BondⅢ6ml30mlボトル, 手染めPBS, VENTANAクリアオーバーレイ, 各種ラベルキット, ABC液, ABC二次抗体はこちら
+          *GATA3, HNF4α, BondⅢ6ml30mlボトル, 手染めPBS, VENTANAクリアオーバーレイ, 各種ラベルキット, ABC液, ABC二次抗体はこちら
         </p>
         <div className="flex items-center space-x-4 mb-4">
           <label className="font-bold">試薬選択:</label>
@@ -227,7 +186,7 @@ export default function OutboundPage() {
             ))}
           </select>
         </div>
-  
+
         {selectedDocId && (
           <div className="space-y-4">
             <div>
@@ -248,8 +207,8 @@ export default function OutboundPage() {
           </div>
         )}
       </div>
-  
-      {/* エラーメッセージのポップアップ */}
+
+      {/* エラーメッセージ */}
       {errorMessage && (
         <div className="fixed inset-0 flex items-center justify-center bg-gray-700 bg-opacity-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md text-center">
@@ -265,5 +224,5 @@ export default function OutboundPage() {
         </div>
       )}
     </div>
-  );  
+  );
 }

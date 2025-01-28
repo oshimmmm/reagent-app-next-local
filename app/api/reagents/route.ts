@@ -1,4 +1,5 @@
 // app/api/reagents/route.ts
+// reagentsの全データを取得。
 import { NextResponse } from "next/server"
 import { prisma } from "@/app/libs/prisma"
 

@@ -82,7 +82,7 @@ async function migrateReagents(firestore: FirebaseFirestore.Firestore) {
 }
 
 async function migrateHistories(firestore: FirebaseFirestore.Firestore) {
-  const snapshot = await firestore.collection('histories').get()
+  const snapshot = await firestore.collection("histories").get()
   for (const doc of snapshot.docs) {
     const data = doc.data()
     const {
@@ -90,25 +90,26 @@ async function migrateHistories(firestore: FirebaseFirestore.Firestore) {
       date,
       lotNumber,
       productNumber,
+      user,
+      oldStock,
+      newStock,
+      oldValueStock,
+      newValueStock,
     } = data
 
-    // date はタイムスタンプなら変換
     const dateVal = date ? date.toDate() : new Date()
 
-    // Reagent との関連付けが必要なら、productNumber で Reagent のid を取得
-    // ※ Reagentモデルで productNumber を unique 指定している想定
-    const reagent = await prisma.reagent.findUnique({
-      where: { productNumber },
-    })
-
-    // PostgreSQLへINSERT
     await prisma.history.create({
       data: {
-        actionType: actionType || '',
+        actionType: actionType || "",
         date: dateVal,
-        lotNumber: lotNumber || '',
-        productNumber: productNumber || '',
-        reagentId: reagent?.id, // リレーション確立
+        lotNumber: lotNumber || "",
+        productNumber: productNumber || "",
+        user: user ?? null,
+        oldStock: oldStock ?? null,
+        newStock: newStock ?? null,
+        oldValueStock: oldValueStock ?? null,
+        newValueStock: newValueStock ?? null,
       },
     })
   }
