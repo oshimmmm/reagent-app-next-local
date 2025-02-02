@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # 例: reagent-db というサービス名のPostgreSQLコンテナを立てる
   reagent-db:
     image: postgres:17
     container_name: reagent-db-container
@@ -10,10 +9,22 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: reagent_db
     ports:
-      - '5433:5432' # 既存コンテナとポートが衝突しないように外部ポート5433を使う例
+      - '5433:5432'
     volumes:
       - reagent-db-data:/var/lib/postgresql/data
       - ./db-init:/docker-entrypoint-initdb.d
+    restart: always
+
+  reagent-app:
+    build: .
+    container_name: reagent-app-container
+    environment:
+      NODE_ENV: production
+      API_URL: "https://example.com/api"
+    ports:
+      - '3002:3002'
+    depends_on:
+      - reagent-db
     restart: always
 
 volumes:

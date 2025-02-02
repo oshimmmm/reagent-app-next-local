@@ -265,7 +265,27 @@ export default function HomePage() {
               </th>
               <th className="p-2 border">在庫数</th>
               <th className="p-2 border">使用中ロット</th>
-              <th className="p-2 border">最長使用期限</th>
+              <th className="p-2 border">
+                <div
+                  onClick={() => requestSort('maxExpiry')}
+                  style={getHeaderStyle('maxExpiry')}
+                  className="text-lg cursor-pointer"
+                >
+                  最長使用期限
+                </div>
+                <select
+                  value={selectedFilters.maxExpiry || ''}
+                  onChange={(e) => handleFilterChange('maxExpiry', e.target.value)}
+                  className="font-normal border border-gray-300 rounded w-full"
+                >
+                  <option value="">すべて</option>
+                  {uniqueValues.maxExpiry?.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </th>
               <th className="p-2 border">月末残量</th>
               <th className="p-2 border">発注の可否</th>
               <th className="p-2 border">発注数</th>

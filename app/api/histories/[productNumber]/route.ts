@@ -8,10 +8,14 @@ import { prisma } from "@/app/libs/prisma";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { productNumber: string } }
+  context: { params: Promise<{ productNumber: string }> }
 ) {
+  // context は Promise ではないので、直接分割して params を取得し、
+  // params（Promise）を await して解決します
+  const { params } = context;
+  const resolvedParams = await params; // Promise<{ productNumber: string }> を解決
   try {
-    const productNumber = params.productNumber;
+    const productNumber = resolvedParams.productNumber;
     const url = new URL(request.url);
     const order = url.searchParams.get("order") || "desc";
 
@@ -22,7 +26,6 @@ export async function GET(
       },
     });
 
-    // dateを string化するなど必要なら整形
     const data = histories.map((h) => ({
       id: h.id,
       productNumber: h.productNumber,

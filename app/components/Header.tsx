@@ -29,8 +29,9 @@ export default function Header() {
   const adminLinks = [
     ...commonLinks,
     { path: "/manage", label: "試薬情報編集" },
-    { path: "/archive", label: "アーカイブ" },
     { path: "/user", label: "ユーザー管理" },
+    { path: "/backup", label: "バックアップ" },
+    { path: "/archive", label: "アーカイブ" }, 
   ];
 
   // 管理者なら adminLinks、それ以外なら commonLinks

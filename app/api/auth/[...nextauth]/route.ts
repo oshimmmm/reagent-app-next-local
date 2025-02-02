@@ -4,7 +4,7 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import Credentials from "next-auth/providers/credentials"
 import { prisma } from "@/app/libs/prisma" // PrismaClientをexportしているファイル
 
-export const authOptions: AuthOptions = {
+const authOptions: AuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
     Credentials({

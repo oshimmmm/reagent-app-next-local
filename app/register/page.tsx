@@ -1,10 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { doc, getDoc, setDoc } from "firebase/firestore";
 import { parseCode } from "../libs/parseCode";
 import { parseNoGCode } from "../libs/parseNoGCode";
-import { db } from "../utils/firebase";
 
 export default function RegisterPage() {
   const [scanValue, setScanValue] = useState("");
@@ -15,12 +13,12 @@ export default function RegisterPage() {
   const [noOrderOnZeroStock, setNoOrderOnZeroStock] = useState<boolean>(false);
   const [orderTriggerValueStock, setOrderTriggerValueStock] = useState<number>(0);
   const [valueStock, setValueStock] = useState<number>(0);
-
-  // 追加: 物流コードを入力するステート
+  // 追加: 物流コード、保管場所、発注数のステート
   const [orderValue, setOrderValue] = useState<string>("");
   const [location, setLocation] = useState<string>("");
   const [orderQuantity, setOrderQuantity] = useState<number>(1);
 
+  // GS1バーコードによる登録
   const handleRegister = async () => {
     try {
       if (!reagentName.trim()) {
@@ -29,36 +27,44 @@ export default function RegisterPage() {
 
       const { productNumber } = parseCode(scanValue);
 
-      // 既に登録済みかチェック
-      const reagentRef = doc(db, "reagents", productNumber);
-      const snap = await getDoc(reagentRef);
-      if (snap.exists()) {
-        throw new Error("既に登録済みの試薬です。");
-      }
-
-      // 新規登録
-      await setDoc(reagentRef, {
-        name: reagentName.trim(),
-        stock: 0,
-        orderTriggerStock,
-        orderTriggerExpiry,
-        noOrderOnZeroStock,
-        orderTriggerValueStock: noOrderOnZeroStock ? orderTriggerValueStock : null,
-        valueStock,
-        orderValue,
-        location,
-        orderQuantity,
+      // POST リクエストで新規登録を実施
+      const response = await fetch("/api/reagents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productNumber,
+          name: reagentName.trim(),
+          stock: 0,
+          orderTriggerStock,
+          orderTriggerExpiry,
+          noOrderOnZeroStock,
+          orderTriggerValueStock: noOrderOnZeroStock ? orderTriggerValueStock : null,
+          valueStock,
+          orderValue,
+          location,
+          orderQuantity,
+        }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "登録に失敗しました。");
+      }
 
       alert(`登録しました: [${productNumber}] 試薬名: ${reagentName}`);
       setScanValue("");
       setReagentName("");
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(error);
-      alert(error);
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert("予期せぬエラーが発生しました");
+      }
     }
   };
 
+  // 非GS1バーコード（ロシュ試薬）の登録
   const handleNonGs1Register = async () => {
     try {
       if (!reagentName.trim()) {
@@ -67,44 +73,49 @@ export default function RegisterPage() {
 
       const { productNumber } = parseNoGCode(nonGs1ScanValue);
 
-      // 既に登録済みかチェック
-      const reagentRef = doc(db, "reagents", productNumber);
-      const snap = await getDoc(reagentRef);
-      if (snap.exists()) {
-        throw new Error("既に登録済みの試薬です。");
-      }
-
-      // 新規登録（ロシュ試薬）
-      await setDoc(reagentRef, {
-        name: reagentName.trim(),
-        stock: 0,
-        orderTriggerStock,
-        orderTriggerExpiry,
-        noOrderOnZeroStock,
-        orderTriggerValueStock: noOrderOnZeroStock ? orderTriggerValueStock : null,
-        valueStock,
-        // ここで「物流コード」を orderValue というフィールド名で Firestore に保存
-        orderValue,
-        location,
-        orderQuantity,
+      // POST リクエストで新規登録を実施
+      const response = await fetch("/api/reagents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productNumber,
+          name: reagentName.trim(),
+          stock: 0,
+          orderTriggerStock,
+          orderTriggerExpiry,
+          noOrderOnZeroStock,
+          orderTriggerValueStock: noOrderOnZeroStock ? orderTriggerValueStock : null,
+          valueStock,
+          orderValue,
+          location,
+          orderQuantity,
+        }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "登録に失敗しました。");
+      }
 
       alert(`登録しました: [${productNumber}] 試薬名: ${reagentName}`);
       setNonGs1ScanValue("");
       setReagentName("");
-      // 入力欄もリセットしたければこちら
       setOrderValue("");
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(error);
-      alert(error);
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert("予期せぬエラーが発生しました");
+      }
     }
   };
 
   return (
     <div className="container mx-auto px-6 py-8">
       <h1 className="text-3xl font-bold mb-6 text-center">試薬登録</h1>
-  
-      {/* 試薬名の入力フィールド */}
+
+      {/* 試薬名の入力 */}
       <div className="mb-6">
         <label className="block text-lg font-semibold mb-2">試薬名:</label>
         <input
@@ -114,7 +125,7 @@ export default function RegisterPage() {
           onChange={(e) => setReagentName(e.target.value)}
         />
       </div>
-  
+
       {/* 物流コード */}
       <div className="mb-6">
         <label className="block text-lg font-semibold mb-2">物流コード:</label>
@@ -125,7 +136,7 @@ export default function RegisterPage() {
           onChange={(e) => setOrderValue(e.target.value)}
         />
       </div>
-  
+
       {/* 保管場所 */}
       <div className="mb-6">
         <label className="block text-lg font-semibold mb-2">保管場所:</label>
@@ -136,7 +147,7 @@ export default function RegisterPage() {
           onChange={(e) => setLocation(e.target.value)}
         />
       </div>
-  
+
       {/* 発注数 */}
       <div className="mb-6">
         <label className="block text-lg font-semibold mb-2">発注数:</label>
@@ -147,8 +158,8 @@ export default function RegisterPage() {
           onChange={(e) => setOrderQuantity(Number(e.target.value))}
         />
       </div>
-  
-      {/* 以下、既存の設定項目 */}
+
+      {/* 在庫数がいくつ以下で発注するか */}
       <div className="mb-6">
         <label className="block text-lg font-semibold mb-2">
           在庫数がいくつ以下になったら発注するか:
@@ -160,7 +171,7 @@ export default function RegisterPage() {
           onChange={(e) => setOrderTriggerStock(Number(e.target.value))}
         />
       </div>
-  
+
       {/* 在庫が0でも発注しない */}
       <div className="mb-6">
         <label className="inline-flex items-center space-x-3">
@@ -173,7 +184,7 @@ export default function RegisterPage() {
           <span className="text-lg font-semibold">在庫が0でも発注しない</span>
         </label>
       </div>
-  
+
       {/* 月末残量と規格 */}
       {noOrderOnZeroStock && (
         <div className="space-y-6 mb-6">
@@ -188,7 +199,7 @@ export default function RegisterPage() {
               onChange={(e) => setOrderTriggerValueStock(Number(e.target.value))}
             />
           </div>
-  
+
           <div>
             <label className="block text-lg font-semibold mb-2">何μL規格か？:</label>
             <input
@@ -200,7 +211,7 @@ export default function RegisterPage() {
           </div>
         </div>
       )}
-  
+
       {/* 最長使用期限 */}
       <div className="mb-6">
         <label className="inline-flex items-center space-x-3">
@@ -231,7 +242,7 @@ export default function RegisterPage() {
           GS1登録
         </button>
       </div>
-  
+
       {/* ロシュ試薬用バーコード */}
       <div className="flex items-center space-x-4 mb-6">
         <input
@@ -249,5 +260,4 @@ export default function RegisterPage() {
       </div>
     </div>
   );
-  
 }

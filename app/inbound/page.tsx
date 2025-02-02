@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { parseCode } from "../libs/parseCode";
 import { parseNoGCode } from "../libs/parseNoGCode";
-import { prisma } from "../libs/prisma"; // ここは直接importできないため、後述のAPI呼び出し
 // ↑ Next.jsのApp Routerでは、サーバーAPI or server actionが必要
 // なので実際には API Route を呼ぶ形が定番
 

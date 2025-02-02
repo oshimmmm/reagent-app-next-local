@@ -1,5 +1,5 @@
 // next-auth.d.ts
-import NextAuth, { DefaultSession } from "next-auth"
+import { DefaultSession } from "next-auth"
 
 // ↓ JWTを使う場合は next-auth/jwt もimport
 // import { JWT } from "next-auth/jwt"
