@@ -2,50 +2,45 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../context/AuthContext";
+import { useSession } from "next-auth/react";
 
-// Firestore版では UserData として管理していた構造
 interface UserData {
   username: string;
   email: string;
   isAdmin: boolean;
 }
 
-// 一覧表示用の型（Prisma の User モデルの id を利用）
 interface UserListItem extends UserData {
   id: string;
 }
 
 export default function UserManagementPage() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { data: session, status } = useSession();
 
-  // 1) 管理者以外はアクセス禁止
+  // 管理者以外はアクセス不可
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
+    if (status !== "loading") {
+      if (!session) {
         router.push("/login");
-      } else if (!user.isAdmin) {
+      } else if (!session.user?.isAdmin) {
         router.push("/home");
       }
     }
-  }, [loading, user, router]);
+  }, [session, status, router]);
 
-  // 2) 新規ユーザー登録用の状態
   const [regUsername, setRegUsername] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regIsAdmin, setRegIsAdmin] = useState(false);
   const [regError, setRegError] = useState("");
   const [regSuccess, setRegSuccess] = useState("");
 
-  // 3) ユーザー一覧・編集用の状態
   const [userList, setUserList] = useState<UserListItem[]>([]);
   const [selectedUsername, setSelectedUsername] = useState("");
   const [editIsAdmin, setEditIsAdmin] = useState(false);
   const [editError, setEditError] = useState("");
   const [editSuccess, setEditSuccess] = useState("");
 
-  // 4) 初回読み込み時に全ユーザーを取得する
   const fetchUsers = async () => {
     try {
       const res = await fetch("/api/users");
@@ -63,22 +58,18 @@ export default function UserManagementPage() {
     fetchUsers();
   }, []);
 
-  // 5) 新規ユーザー登録（POST /api/users）
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegError("");
     setRegSuccess("");
 
-    // A) 重複チェック（既存リストから確認）
     if (userList.find((u) => u.username === regUsername)) {
       setRegError("このユーザー名はすでに使用されています。");
       return;
     }
 
     try {
-      // B) 仮のメールアドレスを生成
       const genEmail = `${regUsername}`;
-      // C) API 経由で新規登録
       const res = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -108,7 +99,6 @@ export default function UserManagementPage() {
     }
   };
 
-  // 6) ユーザー編集（isAdmin 更新）→ PATCH /api/users/[id]
   const handleUpdateUser = async () => {
     setEditError("");
     setEditSuccess("");
@@ -146,7 +136,6 @@ export default function UserManagementPage() {
     }
   };
 
-  // 7) ユーザー削除 → DELETE /api/users/[id]
   const handleDeleteUser = async () => {
     setEditError("");
     setEditSuccess("");

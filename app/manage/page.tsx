@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useAuth } from "../context/AuthContext"; // NextAuth 等で管理しているユーザー情報
-// ※ Firebase 固有の firestore 関連の import は削除し、fetch() を利用
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 interface Reagent {
   productNumber: string;
@@ -12,7 +12,18 @@ interface Reagent {
 }
 
 export default function ManagePage() {
-  const { user } = useAuth();
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  // 管理者以外は /home へリダイレクト
+  useEffect(() => {
+    if (status !== "loading") {
+      if (!session || !session.user?.isAdmin) {
+        router.push("/home");
+      }
+    }
+  }, [session, status, router]);
+
   const [reagents, setReagents] = useState<Reagent[]>([]);
   const [selectedReagent, setSelectedReagent] = useState<Reagent | null>(null);
   const [newStock, setNewStock] = useState(0);
@@ -21,14 +32,12 @@ export default function ManagePage() {
   // 編集フォームの位置をスクロールさせるための ref
   const editFormRef = useRef<HTMLDivElement>(null);
 
-  // 初回：API から全試薬情報を取得（GET /api/reagents）
+  // APIから全試薬情報を取得（GET /api/reagents）
   useEffect(() => {
     const fetchReagents = async () => {
       try {
         const res = await fetch("/api/reagents");
-        if (!res.ok) {
-          throw new Error("試薬情報の取得に失敗しました");
-        }
+        if (!res.ok) throw new Error("試薬情報の取得に失敗しました");
         const data = (await res.json()) as Reagent[];
         setReagents(data);
       } catch (error) {
@@ -36,9 +45,9 @@ export default function ManagePage() {
       }
     };
     fetchReagents();
-  }, [user]);
+  }, [session]);
 
-  // 試薬一覧から選択時：編集用のフォームに値をセットし、フォーム位置までスクロール
+  // 試薬選択時に編集フォームへスクロール
   const handleSelect = (r: Reagent) => {
     setSelectedReagent(r);
     setNewStock(r.stock);
@@ -48,18 +57,17 @@ export default function ManagePage() {
       if (editFormRef.current) {
         const rect = editFormRef.current.getBoundingClientRect();
         const elementTop = rect.top + window.scrollY;
-        const offset = 100; // ヘッダー等の高さ分オフセット（例）
+        const offset = 100; // ヘッダー等の高さ分オフセット
         const scrollTarget = elementTop - offset;
         window.scrollTo({ top: scrollTarget, behavior: "smooth" });
       }
     }, 0);
   };
 
-  // 更新処理：対象の試薬を PATCH で更新し、更新履歴を POST で登録
+  // 更新処理：PATCH 試薬情報 & POST 更新履歴
   const handleUpdate = async () => {
     if (!selectedReagent) return;
     try {
-      // ① PATCH リクエストで試薬情報（stock, valueStock）を更新
       const patchRes = await fetch(`/api/reagents/${selectedReagent.productNumber}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -73,21 +81,19 @@ export default function ManagePage() {
         throw new Error(errData.error || "試薬情報の更新に失敗しました");
       }
 
-      // ② POST リクエストで更新履歴を登録（POST /api/histories）
       const historyRes = await fetch("/api/histories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           productNumber: selectedReagent.productNumber,
           actionType: "update",
-          // 日時はサーバー側で現在日時を設定してもよいが、ここではクライアント側で送信
           date: new Date().toISOString(),
-          user: user?.email || user?.uid || "unknown",
+          user: session?.user?.email || session?.user?.id || "unknown",
           oldStock: selectedReagent.stock,
           newStock: newStock,
           oldValueStock: selectedReagent.valueStock ?? null,
           newValueStock: newValueStock ?? null,
-          lotNumber: "", // 試薬更新時は空文字列（必要に応じて変更）
+          lotNumber: "",
         }),
       });
       if (!historyRes.ok) {
@@ -96,7 +102,6 @@ export default function ManagePage() {
       }
 
       alert("更新しました");
-      // 更新後、必要に応じて reagents 配列の該当要素も更新する
       setReagents((prev) =>
         prev.map((r) =>
           r.productNumber === selectedReagent.productNumber
@@ -114,7 +119,7 @@ export default function ManagePage() {
     }
   };
 
-  // 削除処理：対象の試薬を DELETE で削除
+  // 削除処理：DELETE 試薬情報
   const handleDelete = async () => {
     if (!selectedReagent) return;
     try {
@@ -142,9 +147,7 @@ export default function ManagePage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* ページタイトル */}
       <h1 className="text-3xl font-bold text-center mb-8">試薬情報編集</h1>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* 試薬一覧 */}
         <div className="bg-white shadow-md rounded-lg p-6">
@@ -167,14 +170,11 @@ export default function ManagePage() {
             </ul>
           )}
         </div>
-
         {/* 編集フォーム */}
         <div ref={editFormRef} className="bg-white shadow-md rounded-lg p-6">
           {selectedReagent ? (
             <>
               <h2 className="text-xl font-semibold mb-4">{selectedReagent.name} の編集</h2>
-
-              {/* 在庫数 */}
               <div className="mb-4">
                 <label className="block mb-1 font-medium">在庫数</label>
                 <input
@@ -184,8 +184,6 @@ export default function ManagePage() {
                   className="border border-gray-300 rounded px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
-
-              {/* 月末残量 */}
               <div className="mb-6">
                 <label className="block mb-1 font-medium">月末残量</label>
                 <input
@@ -195,8 +193,6 @@ export default function ManagePage() {
                   className="border border-gray-300 rounded px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
-
-              {/* ボタン */}
               <div className="flex items-center space-x-4">
                 <button
                   onClick={handleUpdate}

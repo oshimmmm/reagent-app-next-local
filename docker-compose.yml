@@ -19,8 +19,14 @@ services:
     build: .
     container_name: reagent-app-container
     environment:
+      environment:
       NODE_ENV: production
       API_URL: "https://example.com/api"
+      PORT: 3002
+      DB_HOST: reagent-db
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: reagent_db
     ports:
       - '3002:3002'
     depends_on:
