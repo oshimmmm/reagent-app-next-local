@@ -10,8 +10,7 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ productNumber: string }> }
 ) {
-  // context は Promise ではないので、直接分割して params を取得し、
-  // params（Promise）を await して解決します
+  // context.params を await してから利用する
   const { params } = context;
   const resolvedParams = await params; // Promise<{ productNumber: string }> を解決
   try {
@@ -43,5 +42,35 @@ export async function GET(
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: "Failed to fetch history" }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/histories/[productNumber]
+ *
+ * 指定の productNumber に紐づく履歴レコードをすべて削除します。
+ */
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ productNumber: string }> }
+) {
+  const { params } = context;
+  const resolvedParams = await params;
+  try {
+    const productNumber = resolvedParams.productNumber;
+    // 指定の productNumber の履歴をすべて削除
+    const deleted = await prisma.history.deleteMany({
+      where: { productNumber },
+    });
+    return NextResponse.json(
+      { message: "Histories deleted", count: deleted.count },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json(
+      { error: "Failed to delete histories" },
+      { status: 500 }
+    );
   }
 }
