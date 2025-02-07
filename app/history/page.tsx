@@ -302,8 +302,19 @@ export default function HistoryPage() {
       {viewMode === "range" && rangeHistories.length > 0 && (
         <div ref={rangeContainerRef} className="max-w-4xl mx-auto mt-12">
           <h2 className="text-2xl font-bold mb-4">
-            {formatDateString(startDate)} 〜 {formatDateString(endDate)} の全履歴一覧
+            {formatDateString(startDate)} 〜 {formatDateString(endDate)} <br />
+            試薬入出庫管理台帳
           </h2>
+
+          {/* 印刷ボタン（範囲検索結果） */}
+          <div className="mt-4 hide-on-print">
+            <button
+              onClick={() => window.print()}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              印刷
+            </button>
+          </div>
 
           {rangeHistories.map((group) => (
             <div key={group.productNumber} className="mb-8">

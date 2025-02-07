@@ -259,7 +259,7 @@ export default function InboundPage() {
       <div className="border p-6 rounded-lg shadow-md bg-gray-50">
         <h2 className="text-xl font-semibold mb-4">その他入庫</h2>
         <p className="mb-4 text-gray-600">
-          *GATA3, HNF4α, BondⅢ6ml30mlボトル...など
+        *GATA3, HNF4α, BondⅢ6ml30mlボトル, 手染めPBS, VENTANAクリアオーバーレイ, 各種ラベルキット, ABC液, ABC二次抗体はこちら
         </p>
         <div className="flex items-center space-x-4 mb-4">
           <label className="font-bold">試薬選択:</label>
@@ -309,7 +309,8 @@ export default function InboundPage() {
 
       {/* 注意書き */}
       <p className="mt-6 text-sm text-gray-600">
-        *ALK, Arginase-1, Bond Enzyme Pretreatment... などは未登録
+      *ALK, Arginase-1, Bond Enzyme Pretreatment, HEG1, DISH試薬, MSH2, MUC6, PD-L1(SP142)はまだ試薬登録していません。
+      上記試薬入庫時は大島を呼んでください。
       </p>
 
       {/* エラーメッセージ */}
