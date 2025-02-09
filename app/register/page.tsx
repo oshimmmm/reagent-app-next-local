@@ -1,8 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { parseCode } from "../libs/parseCode";
 import { parseNoGCode } from "../libs/parseNoGCode";
+
+// APIから取得する生データ用の型（DB の各フィールドを含む）
+interface APIReagent {
+  productNumber: string;
+  name: string | null;
+  // 他のフィールドは省略
+  location: string | null;
+}
 
 export default function RegisterPage() {
   const [scanValue, setScanValue] = useState("");
@@ -13,10 +21,33 @@ export default function RegisterPage() {
   const [noOrderOnZeroStock, setNoOrderOnZeroStock] = useState<boolean>(false);
   const [orderTriggerValueStock, setOrderTriggerValueStock] = useState<number>(0);
   const [valueStock, setValueStock] = useState<number>(0);
-  // 追加: 物流コード、保管場所、発注数のステート
+  // 追加: 物流コード、発注数のステートはそのまま
   const [orderValue, setOrderValue] = useState<string>("");
-  const [location, setLocation] = useState<string>("");
   const [orderQuantity, setOrderQuantity] = useState<number>(1);
+
+  // ここで保管場所の入力用の状態を管理
+  const [locationOptions, setLocationOptions] = useState<string[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<string>("");
+  const [customLocation, setCustomLocation] = useState<string>("");
+
+  // API から既存の保管場所情報を取得（例として /api/reagents を利用）
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        const res = await fetch("/api/reagents");
+        if (!res.ok) throw new Error("試薬情報の取得に失敗しました");
+        const data = (await res.json()) as APIReagent[];
+        // location フィールドが存在するもののみ抽出し、重複を除く
+        const uniqueLocations = Array.from(
+          new Set(data.map((item) => item.location).filter((loc): loc is string => !!loc))
+        );
+        setLocationOptions(uniqueLocations);
+      } catch (error) {
+        console.error("保管場所取得エラー:", error);
+      }
+    };
+    fetchLocations();
+  }, []);
 
   // GS1バーコードによる登録
   const handleRegister = async () => {
@@ -26,6 +57,9 @@ export default function RegisterPage() {
       }
 
       const { productNumber } = parseCode(scanValue);
+
+      // 送信する保管場所は、プルダウンで「その他」が選ばれている場合は customLocation を、それ以外は selectedLocation を使う
+      const locationValue = selectedLocation === "custom" ? customLocation : selectedLocation;
 
       // POST リクエストで新規登録を実施
       const response = await fetch("/api/reagents", {
@@ -41,7 +75,7 @@ export default function RegisterPage() {
           orderTriggerValueStock: noOrderOnZeroStock ? orderTriggerValueStock : null,
           valueStock,
           orderValue,
-          location,
+          location: locationValue,
           orderQuantity,
         }),
       });
@@ -73,7 +107,8 @@ export default function RegisterPage() {
 
       const { productNumber } = parseNoGCode(nonGs1ScanValue);
 
-      // POST リクエストで新規登録を実施
+      const locationValue = selectedLocation === "custom" ? customLocation : selectedLocation;
+
       const response = await fetch("/api/reagents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -87,7 +122,7 @@ export default function RegisterPage() {
           orderTriggerValueStock: noOrderOnZeroStock ? orderTriggerValueStock : null,
           valueStock,
           orderValue,
-          location,
+          location: locationValue,
           orderQuantity,
         }),
       });
@@ -119,6 +154,7 @@ export default function RegisterPage() {
       <div className="mb-6">
         <label className="block text-lg font-semibold mb-2">試薬名:</label>
         <input
+          type="text"
           className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-400"
           placeholder="試薬名を入力"
           value={reagentName}
@@ -130,6 +166,7 @@ export default function RegisterPage() {
       <div className="mb-6">
         <label className="block text-lg font-semibold mb-2">物流コード:</label>
         <input
+          type="text"
           className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-indigo-400"
           placeholder="物流コードを入力"
           value={orderValue}
@@ -137,15 +174,31 @@ export default function RegisterPage() {
         />
       </div>
 
-      {/* 保管場所 */}
+      {/* 保管場所：プルダウン＋カスタム入力 */}
       <div className="mb-6">
         <label className="block text-lg font-semibold mb-2">保管場所:</label>
-        <input
-          className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          placeholder="保管場所を入力"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-        />
+        <select
+          className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-2"
+          value={selectedLocation}
+          onChange={(e) => setSelectedLocation(e.target.value)}
+        >
+          <option value="">選択してください</option>
+          {locationOptions.map((loc) => (
+            <option key={loc} value={loc}>
+              {loc}
+            </option>
+          ))}
+          <option value="custom">その他</option>
+        </select>
+        {selectedLocation === "custom" && (
+          <input
+            type="text"
+            className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            placeholder="保管場所を入力"
+            value={customLocation}
+            onChange={(e) => setCustomLocation(e.target.value)}
+          />
+        )}
       </div>
 
       {/* 発注数 */}
@@ -159,7 +212,7 @@ export default function RegisterPage() {
         />
       </div>
 
-      {/* 在庫数がいくつ以下で発注するか */}
+      {/* 在庫数がいくつ以下になったら発注するか */}
       <div className="mb-6">
         <label className="block text-lg font-semibold mb-2">
           在庫数がいくつ以下になったら発注するか:
@@ -199,7 +252,6 @@ export default function RegisterPage() {
               onChange={(e) => setOrderTriggerValueStock(Number(e.target.value))}
             />
           </div>
-
           <div>
             <label className="block text-lg font-semibold mb-2">何μL規格か？:</label>
             <input
@@ -230,6 +282,7 @@ export default function RegisterPage() {
       {/* GS1 バーコード */}
       <div className="flex items-center space-x-4 mb-6">
         <input
+          type="text"
           className="border border-gray-300 rounded-lg px-4 py-2 w-1/3 focus:outline-none focus:ring-2 focus:ring-blue-400"
           placeholder="GS1バーコードをスキャン"
           value={scanValue}
@@ -246,8 +299,9 @@ export default function RegisterPage() {
       {/* ロシュ試薬用バーコード */}
       <div className="flex items-center space-x-4 mb-6">
         <input
+          type="text"
           className="border border-gray-300 rounded-lg px-4 py-2 w-1/3 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          placeholder="【ロシュ】 バーコードをスキャン"
+          placeholder="【ロシュ】バーコードをスキャン"
           value={nonGs1ScanValue}
           onChange={(e) => setNonGs1ScanValue(e.target.value)}
         />

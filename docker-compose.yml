@@ -19,7 +19,6 @@ services:
     build: .
     container_name: reagent-app-container
     environment:
-      environment:
       NODE_ENV: production
       API_URL: "https://example.com/api"
       PORT: 3002
