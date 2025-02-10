@@ -4,28 +4,25 @@ import React, { useState, useEffect, useRef } from "react";
 import { parseCode } from "../libs/parseCode";
 import { parseNoGCode } from "../libs/parseNoGCode";
 
-// Firestore関連を削除し、Prisma+Postgresは API Route を呼び出す形に変更
-
 export default function OutboundPage() {
   const [scanValue, setScanValue] = useState("");
   const [scanNoGValue, setScanNoGValue] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // 手入力用
+  // 手入力用（その他出庫）の状態
   const [alphabetDocs, setAlphabetDocs] = useState<{ id: string; name: string }[]>([]);
-  const [selectedDocId, setSelectedDocId] = useState<string>("");  
-  const [manualLot, setManualLot] = useState<string>("");  
+  const [selectedDocId, setSelectedDocId] = useState<string>("");
+  const [manualLot, setManualLot] = useState<string>("");
 
-  // input要素にフォーカス
+  // input要素へのref (GS1 バーコード用)
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // マウント時に input へフォーカス
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  /**
-   * 1) 「docIDがアルファベットで始まる」Reagent一覧を取得
-   *    例: /api/reagents-alphabet から { id, name }[] をfetch
-   */
+  // 1) 「アルファベットで始まる」Reagent一覧を /api/reagents-alphabet から取得
   useEffect(() => {
     const fetchAlphabetDocs = async () => {
       try {
@@ -41,39 +38,33 @@ export default function OutboundPage() {
     fetchAlphabetDocs();
   }, []);
 
-  /**
-   * 2) GS1 バーコードで出庫
-   */
+  // 2) GS1 バーコードによる出庫処理
   const handleOutbound = async () => {
     if (!scanValue) return;
     try {
       const { productNumber, lotNumber } = parseCode(scanValue);
       await commonOutboundLogic(productNumber, lotNumber);
       setScanValue("");
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(error);
       setErrorMessage(error instanceof Error ? error.message : "不明なエラーが発生しました。");
     }
   };
 
-  /**
-   * 3) Roche バーコードで出庫
-   */
+  // 3) Roche バーコードによる出庫処理
   const handleNoGOutbound = async () => {
     if (!scanNoGValue) return;
     try {
       const { productNumber, lotNumber } = parseNoGCode(scanNoGValue);
       await commonOutboundLogic(productNumber, lotNumber);
       setScanNoGValue("");
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(error);
       setErrorMessage(error instanceof Error ? error.message : "不明なエラーが発生しました。");
     }
   };
 
-  /**
-   * 4) 手入力で出庫
-   */
+  // 4) 手入力による出庫処理
   const handleManualOutbound = async () => {
     if (!selectedDocId) {
       setErrorMessage("試薬を選択してください。");
@@ -87,23 +78,21 @@ export default function OutboundPage() {
       await commonOutboundLogic(selectedDocId, manualLot);
       setSelectedDocId("");
       setManualLot("");
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(error);
       setErrorMessage(error instanceof Error ? error.message : "不明なエラーが発生しました。");
     }
   };
 
   /**
-   * 5) 共通の出庫ロジック
-   *    - DBから在庫を1減らし、currentLotを更新
-   *    - Historyに出庫ログを追加
+   * 共通の出庫処理
+   * APIエンドポイント /api/lots/outbound を呼び出し、出庫処理を実行する。
    */
   const commonOutboundLogic = async (productNumber: string, lotNumber: string) => {
-    // ここで /api/outbound にPOSTして、サーバー側(Prisma)で在庫更新 & 履歴追加を行う
-    const res = await fetch("/api/outbound", {
+    const res = await fetch("/api/lots/outbound", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productNumber, lotNumber }),
+      body: JSON.stringify({ productNumber, lotNumber, outboundQuantity: 1 }),
     });
 
     if (!res.ok) {
@@ -118,7 +107,7 @@ export default function OutboundPage() {
     <div className="container mx-auto px-4 py-6">
       <h1 className="text-3xl font-bold mb-6 text-center text-indigo-700 drop-shadow-md">出庫処理</h1>
 
-      {/* GS1 バーコード */}
+      {/* GS1 バーコード用 */}
       <div className="border p-4 rounded-lg shadow-md mb-6 bg-gray-50">
         <h2 className="text-xl font-semibold mb-4">GS1 バーコードスキャン</h2>
         <div className="flex items-center space-x-4">
@@ -142,7 +131,7 @@ export default function OutboundPage() {
         </div>
       </div>
 
-      {/* Roche バーコード */}
+      {/* Roche バーコード用 */}
       <div className="border p-4 rounded-lg shadow-md mb-6 bg-gray-50">
         <h2 className="text-xl font-semibold mb-4">Roche バーコードスキャン</h2>
         <div className="flex items-center space-x-4">

@@ -32,6 +32,7 @@ export default function Header() {
     { path: "/user", label: "ユーザー管理" },
     { path: "/backup", label: "バックアップ" },
     { path: "/archive", label: "アーカイブ" }, 
+    { path: "/ledger", label: "在庫管理台帳" },
   ];
 
   // 管理者なら adminLinks、それ以外なら commonLinks
