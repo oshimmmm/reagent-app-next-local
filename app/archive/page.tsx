@@ -73,7 +73,8 @@ export default function ArchivePage() {
     }
   };
 
-  // 全件一括削除：表示されている履歴をすべて削除する
+  // 全件一括削除：新規一括削除用エンドポイント /api/histories/range を利用
+  // リクエストボディで startDate, endDate, （任意で selectedReagent）を送信
   const handleDeleteAll = async () => {
     if (histories.length === 0) return;
     const confirmDelete = window.confirm("表示されている全ての履歴を削除してもよろしいですか？");
@@ -81,14 +82,19 @@ export default function ArchivePage() {
 
     setIsDeletingAll(true);
     try {
-      // 各履歴に対して並行してDELETEリクエストを送信
-      await Promise.all(
-        histories.map((h) =>
-          fetch(`/api/histories/${h.id}`, { method: "DELETE" })
-        )
-      );
+      const res = await fetch("/api/histories/range", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          start: startDate,
+          end: endDate,
+          productNumber: selectedReagent || undefined, // 選択されていればフィルタ条件として送信
+        }),
+      });
+      if (!res.ok) throw new Error("全削除に失敗しました");
+      const result = await res.json();
+      alert(`削除完了: ${result.count} 件`);
       setHistories([]);
-      alert("すべての履歴が削除されました。");
     } catch (error) {
       console.error("全削除エラー:", error);
       alert("全削除に失敗しました。");

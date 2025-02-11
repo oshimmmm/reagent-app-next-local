@@ -100,7 +100,7 @@ export default function LedgerPage() {
       {showTable && (
         <div className="bg-white p-6 rounded shadow-md">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">試薬在庫管理台帳</h2>
+            <h2 className="text-xl font-bold">試薬在庫管理台帳 (2025-02-12~)</h2>
             <button
               onClick={handlePrint}
               className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors hide-on-print"

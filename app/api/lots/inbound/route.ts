@@ -129,6 +129,7 @@ export async function POST(request: NextRequest) {
         lotNumber,
         actionType: "inbound",
         date: new Date(),
+        reagentId: reagent.id,
         // user: session.user?.email など
       },
     });

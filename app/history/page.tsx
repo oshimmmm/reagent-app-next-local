@@ -95,7 +95,11 @@ export default function HistoryPage() {
     setSelectedProductNumber(productNumber);
 
     try {
-      const res = await fetch(`/api/histories/${productNumber}?order=desc`);
+      const res = await fetch(
+        `/api/histories/range?start=2025-01-01&end=2075-12-31&productNumber=${encodeURIComponent(
+          productNumber
+        )}&order=desc`
+      );
       if (!res.ok) {
         throw new Error("履歴情報の取得に失敗しました");
       }

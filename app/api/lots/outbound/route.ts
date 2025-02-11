@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
           lotNumber,
           actionType: "outbound",
           date: new Date(),
+          reagentId: reagent.id,
         },
       });
       return NextResponse.json(
