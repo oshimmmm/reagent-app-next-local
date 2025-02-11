@@ -4,14 +4,22 @@ import { prisma } from "@/app/libs/prisma";
 
 /**
  * GET /api/lots
- * 全Lot情報を取得 (必要ならリレーションで Reagent 情報も含める)
+ * 在庫が0より大きいLot情報を取得し、Reagent情報も含める
+ * 並べ替えは、Reagent.name（昇順）→lotNumber（昇順）
  */
 export async function GET() {
   try {
     const lots = await prisma.lot.findMany({
+      where: {
+        stock: { gt: 0 }  // 在庫が0より大きいもののみ
+      },
       include: {
         reagent: true, // Reagent の情報も取得
       },
+      orderBy: [
+        { reagent: { name: 'asc' } },
+        { lotNumber: 'asc' }
+      ],
     });
     return NextResponse.json(lots, { status: 200 });
   } catch (error) {
