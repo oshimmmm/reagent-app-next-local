@@ -234,7 +234,7 @@ export default function HomePage() {
 
   return (
     <div className="container mx-auto px-4">
-      <h1 className="text-2xl font-bold my-4">試薬在庫管理台帳</h1>
+      <h1 className="text-2xl font-bold my-4">ホーム</h1>
 
       {loadingData ? (
         <p>読み込み中...</p>

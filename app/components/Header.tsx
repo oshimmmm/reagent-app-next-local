@@ -22,17 +22,17 @@ export default function Header() {
     { path: "/outbound", label: "出庫" },
     { path: "/history", label: "履歴" },
     { path: "/order", label: "発注" },
+    { path: "/manage", label: "試薬情報編集" },
+    { path: "/backup", label: "バックアップ" },
+    { path: "/ledger", label: "在庫管理台帳" },
     { path: "/register", label: "試薬登録" },
   ];
 
   // 管理者ユーザーのみ表示したいリンクを追加
   const adminLinks = [
     ...commonLinks,
-    { path: "/manage", label: "試薬情報編集" },
     { path: "/user", label: "ユーザー管理" },
-    { path: "/backup", label: "バックアップ" },
     { path: "/archive", label: "アーカイブ" }, 
-    { path: "/ledger", label: "在庫管理台帳" },
   ];
 
   // 管理者なら adminLinks、それ以外なら commonLinks

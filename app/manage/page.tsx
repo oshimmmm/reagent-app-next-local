@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation";
 
 interface Reagent {
   productNumber: string;
@@ -12,17 +12,17 @@ interface Reagent {
 }
 
 export default function ManagePage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
+  const { data: session } = useSession();
+  // const router = useRouter();
 
-  // 管理者以外は /home へリダイレクト
-  useEffect(() => {
-    if (status !== "loading") {
-      if (!session || !session.user?.isAdmin) {
-        router.push("/home");
-      }
-    }
-  }, [session, status, router]);
+  // // 管理者以外は /home へリダイレクト
+  // useEffect(() => {
+  //   if (status !== "loading") {
+  //     if (!session || !session.user?.isAdmin) {
+  //       router.push("/home");
+  //     }
+  //   }
+  // }, [session, status, router]);
 
   const [reagents, setReagents] = useState<Reagent[]>([]);
   const [selectedReagent, setSelectedReagent] = useState<Reagent | null>(null);
@@ -175,15 +175,17 @@ export default function ManagePage() {
           {selectedReagent ? (
             <>
               <h2 className="text-xl font-semibold mb-4">{selectedReagent.name} の編集</h2>
-              <div className="mb-4">
-                <label className="block mb-1 font-medium">在庫数</label>
-                <input
-                  type="number"
-                  value={newStock}
-                  onChange={(e) => setNewStock(Number(e.target.value))}
-                  className="border border-gray-300 rounded px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-              </div>
+              {session?.user?.isAdmin && (
+                <div className="mb-4">
+                  <label className="block mb-1 font-medium">在庫数</label>
+                    <input
+                      type="number"
+                      value={newStock}
+                      onChange={(e) => setNewStock(Number(e.target.value))}
+                      className="border border-gray-300 rounded px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                </div>
+              )}
               <div className="mb-6">
                 <label className="block mb-1 font-medium">月末残量</label>
                 <input
