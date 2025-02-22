@@ -235,6 +235,7 @@ export default function HomePage() {
   return (
     <div className="container mx-auto px-4">
       <h1 className="text-2xl font-bold my-4">ホーム</h1>
+      <p className="text-xl font-bold my-4">＊月末残量に数値が入力されている試薬は、在庫数が0になっても発注しない試薬です。</p>
 
       {loadingData ? (
         <p>読み込み中...</p>

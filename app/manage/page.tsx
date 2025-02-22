@@ -47,6 +47,11 @@ export default function ManagePage() {
     fetchReagents();
   }, [session]);
 
+  // 管理者なら全件、一般ユーザーなら valueStock に値があるものだけ表示
+  const displayedReagents = session?.user?.isAdmin
+    ? reagents
+    : reagents.filter((r) => r.valueStock !== undefined && r.valueStock !== null && r.valueStock !== 0);
+
   // 試薬選択時に編集フォームへスクロール
   const handleSelect = (r: Reagent) => {
     setSelectedReagent(r);
@@ -88,7 +93,7 @@ export default function ManagePage() {
           productNumber: selectedReagent.productNumber,
           actionType: "update",
           date: new Date().toISOString(),
-          user: session?.user?.email || session?.user?.id || "unknown",
+          user: session?.user?.username || "unknown",
           oldStock: selectedReagent.stock,
           newStock: newStock,
           oldValueStock: selectedReagent.valueStock ?? null,
@@ -147,16 +152,21 @@ export default function ManagePage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-center mb-8">試薬情報編集</h1>
+      <h1 className="text-3xl font-bold text-center mb-8">月末残量修正</h1>
+      <p className="text-red-3xl font-bold text-center mb-8">
+        棚卸時の月末残量の修正のみ行う<br />
+        ☆在庫数の修正はここで行わない☆<br />
+        在庫数がおかしいと思ったら、入庫もしくは出庫処理で帳尻を合わせてください。
+      </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* 試薬一覧 */}
         <div className="bg-white shadow-md rounded-lg p-6">
           <h2 className="text-xl font-semibold mb-4">試薬一覧</h2>
-          {reagents.length === 0 ? (
+          {displayedReagents.length === 0 ? (
             <p className="text-gray-500">試薬がありません。</p>
           ) : (
             <ul className="space-y-2">
-              {reagents.map((r) => (
+              {displayedReagents.map((r) => (
                 <li key={r.productNumber}>
                   <button
                     onClick={() => handleSelect(r)}

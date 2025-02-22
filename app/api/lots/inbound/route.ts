@@ -117,6 +117,7 @@ export async function POST(request: NextRequest) {
         maxExpiry: finalMax,
         // ここで Reagent.stock を inboundQuantity 分加算する
         stock: { increment: inboundQuantity },
+        orderDate: null,
         ...(typeof inputValueStock === "number" && { valueStock: inputValueStock }),
       },
     });

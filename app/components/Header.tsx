@@ -22,7 +22,7 @@ export default function Header() {
     { path: "/outbound", label: "出庫" },
     { path: "/history", label: "履歴" },
     { path: "/order", label: "発注" },
-    { path: "/manage", label: "試薬情報編集" },
+    { path: "/manage", label: "月末残量修正" },
     { path: "/backup", label: "バックアップ" },
     { path: "/ledger", label: "在庫管理台帳" },
     { path: "/register", label: "試薬登録" },

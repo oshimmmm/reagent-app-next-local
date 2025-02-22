@@ -20,7 +20,7 @@ export default function BackupPage() {
 
   return (
     <div className="container mx-auto px-6 py-8">
-      <h1 className="text-3xl font-bold mb-6">バックアップ作成</h1>
+      <h1 className="text-3xl font-bold mb-6 text-center">バックアップ作成</h1>
       <div className="max-w-md mx-auto">
         <div className="mb-4">
           <label className="block font-semibold mb-1">開始日</label>
