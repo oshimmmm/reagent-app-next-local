@@ -99,11 +99,16 @@ export default function LedgerPage() {
       {/* 台帳テーブル */}
       {showTable && (
         <div className="bg-white p-6 rounded shadow-md">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">
-              試薬在庫管理台帳 (2025-02-12~)<br />
-              ＊2025-02-12以前に入出庫された試薬の記録は、試薬消耗品の在庫・使用開始日管理表を参照してください
-            </h2>
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h2 className="text-xl font-bold mb-2">
+                試薬在庫管理台帳 (2025-02-12~)
+              </h2>
+              <p className="text-base text-gray-500">
+                ＊2025-02-12以前に入出庫された試薬はここに表示されません。<br />
+                必要に応じて、試薬消耗品の在庫・使用開始日管理表も参照してください。
+              </p>
+            </div>
             <button
               onClick={handlePrint}
               className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors hide-on-print"
