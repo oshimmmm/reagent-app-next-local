@@ -108,6 +108,9 @@ export default function HomePage() {
   const [sortConfig, setSortConfig] = useState<{ key: keyof Reagent; direction: 'asc' | 'desc' } | null>(null);
   const [selectedFilters, setSelectedFilters] = useState<{ [key in keyof Reagent]?: string }>({});
 
+  // valueStock が 0 以外のデータのみ表示するかを制御する state
+  const [filterValueStockNonZero, setFilterValueStockNonZero] = useState<boolean>(false);
+
   // =========================
   // 1) DBからreagentsを取得
   // =========================
@@ -215,11 +218,17 @@ export default function HomePage() {
   // フィルタ + ソート
   // =========================
   const filteredAndSortedReagents = reagents
-    .filter((reagent) =>
-      Object.entries(selectedFilters).every(([key, value]) =>
+    .filter((reagent) => {
+      // 既存のフィルタ
+      let passes = Object.entries(selectedFilters).every(([key, value]) =>
         value ? String(reagent[key as keyof Reagent]).includes(value) : true
-      )
-    )
+      );
+      // 新たに、filterValueStockNonZero が true の場合、valueStock が 0 以外であるものだけ残す
+      if (filterValueStockNonZero) {
+        passes = passes && reagent.valueStock !== 0;
+      }
+      return passes;
+    })
     .sort((a, b) => {
       if (!sortConfig) return 0;
 
@@ -287,7 +296,15 @@ export default function HomePage() {
                   ))}
                 </select>
               </th>
-              <th className="p-2 border">月末残量</th>
+              <th
+                className="p-2 border cursor-pointer flex items-center justify-center hover:bg-blue-50"
+                onClick={() => setFilterValueStockNonZero(!filterValueStockNonZero)}
+                title="クリックしてフィルターを切り替え"
+              >
+                月末残量 {filterValueStockNonZero ? "(フィルタ中)" : ""}
+                {/* ここで、必要に応じてソートアイコンも表示する */}
+                {/* 例: <span className="ml-1">{sortConfig?.direction === 'asc' ? '↑' : '↓'}</span> */}
+              </th>
               <th className="p-2 border">発注の可否</th>
               <th className="p-2 border">発注数</th>
               <th className="p-2 border">
