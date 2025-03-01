@@ -297,13 +297,12 @@ export default function HomePage() {
                 </select>
               </th>
               <th
-                className="p-2 border cursor-pointer flex items-center justify-center hover:bg-blue-50"
+                className="p-2 border cursor-pointer flex flex-col items-center justify-center hover:bg-blue-50"
                 onClick={() => setFilterValueStockNonZero(!filterValueStockNonZero)}
                 title="クリックしてフィルターを切り替え"
               >
-                月末残量 {filterValueStockNonZero ? "(フィルタ中)" : ""}
-                {/* ここで、必要に応じてソートアイコンも表示する */}
-                {/* 例: <span className="ml-1">{sortConfig?.direction === 'asc' ? '↑' : '↓'}</span> */}
+                <span>月末残量 {filterValueStockNonZero ? "(フィルタ中)" : ""}</span>
+                <span className="mt-1 text-xs text-gray-500">クリックでソート</span>
               </th>
               <th className="p-2 border">発注の可否</th>
               <th className="p-2 border">発注数</th>

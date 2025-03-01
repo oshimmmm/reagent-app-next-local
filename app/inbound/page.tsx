@@ -40,6 +40,9 @@ export default function InboundPage() {
   const [manualLot, setManualLot] = useState<string>("");
   const [manualExpiry, setManualExpiry] = useState<string>("");
 
+  // 入庫ボトル数の state（初期値 1）
+  const [manualBottleCount, setManualBottleCount] = useState<number>(10);
+
   // GS1バーコード用 input 要素へのref
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -125,7 +128,12 @@ export default function InboundPage() {
     }
 
     try {
-      await commonIncomingLogic(selectedDocId, manualLot, expiryDate);
+      // 入庫処理時、もし選択された試薬の名称が "Bond 6ml ボトル" または "Bond 30ml ボトル" なら、manualBottleCount も渡す
+      const selectedDoc = alphabetDocs.find((doc) => doc.id === selectedDocId);
+      const bottleCount = (selectedDoc && (selectedDoc.name === "Bond 6ml ボトル" || selectedDoc.name === "Bond 30ml ボトル"))
+        ? manualBottleCount
+        : undefined;
+      await commonIncomingLogic(selectedDocId, manualLot, expiryDate, bottleCount);
       // 正常終了後にフォームをリセット
       setSelectedDocId("");
       setManualLot("");
@@ -140,7 +148,7 @@ export default function InboundPage() {
    * すべてのバーコード or 手入力に共通する入庫処理
    * 1) Reagentを取得 → 2) valueStockなどを確認 → 3) Lotにアップサート → 4) History記録
    */
-  const commonIncomingLogic = async (productNumber: string, lotNumber: string, expiryDate: Date) => {
+  const commonIncomingLogic = async (productNumber: string, lotNumber: string, expiryDate: Date, bottleCount?: number) => {
     try {
       // 1) DBからReagentを取得
       const res = await fetch(`/api/reagents/${encodeURIComponent(productNumber)}`);
@@ -159,7 +167,7 @@ export default function InboundPage() {
       }
 
       // 3) ポップアップ不要なら、直接入庫を完了
-      await completeIncoming(reagentData, lotNumber, expiryDate, productNumber);
+      await completeIncoming(reagentData, lotNumber, expiryDate, productNumber, bottleCount);
     } catch (error: unknown) {
       console.error(error);
       throw error; // 上位で setErrorMessage
@@ -171,7 +179,8 @@ export default function InboundPage() {
     reagentData: ReagentData,
     lotNumber: string,
     expiryDate: Date,
-    productNumber: string
+    productNumber: string,
+    bottleCount?: number
   ) => {
     try {
       // 既存のロジック: maxExpiry の更新や stock + 1 などがあったが、
@@ -181,7 +190,7 @@ export default function InboundPage() {
         productNumber,
         lotNumber,
         expiryDate: expiryDate.toISOString(),
-        inboundQuantity: 1,
+        inboundQuantity: bottleCount ?? 1,
         // inputValueStock等、ポップアップの値を活用するならここで
         inputValueStock,
       };
@@ -219,10 +228,10 @@ export default function InboundPage() {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <h1 className="text-3xl font-bold mb-6 text-center">入庫処理 (Prisma版)</h1>
+      <h1 className="text-3xl font-bold mb-6 text-center">入庫処理</h1>
 
       {/* GS1 バーコード用 */}
-      <div className="border p-4 rounded-lg shadow-md mb-6 bg-gray-50">
+      <div className="border p-4 rounded-lg shadow-md mb-6 bg-blue-100">
         <h2 className="text-xl font-semibold mb-4">GS1 バーコードスキャン</h2>
         <div className="flex items-center space-x-4">
           <input
@@ -246,7 +255,7 @@ export default function InboundPage() {
       </div>
 
       {/* Roche バーコード用 */}
-      <div className="border p-4 rounded-lg shadow-md mb-6 bg-gray-50">
+      <div className="border p-4 rounded-lg shadow-md mb-6 bg-blue-100">
         <h2 className="text-xl font-semibold mb-4">Roche バーコードスキャン</h2>
         <div className="flex items-center space-x-4">
           <input
@@ -269,7 +278,7 @@ export default function InboundPage() {
       </div>
 
       {/* その他入庫 */}
-      <div className="border p-6 rounded-lg shadow-md bg-gray-50">
+      <div className="border p-6 rounded-lg shadow-md bg-blue-100">
         <h2 className="text-xl font-semibold mb-4">その他入庫</h2>
         <p className="mb-4 text-gray-600">
           *GATA3, HNF4α, BondⅢ6ml 30mlボトル, 手染めPBS, VENTANAクリアオーバーレイ, 各種ラベルキット, ABC液, ABC二次抗体はこちら
@@ -289,6 +298,21 @@ export default function InboundPage() {
             ))}
           </select>
         </div>
+
+        {/* 選択された試薬が Bond 6ml ボトル または Bond 30ml ボトルの場合は、入庫ボトル数の入力を表示 */}
+        {selectedDocId &&
+          (alphabetDocs.find((doc) => doc.id === selectedDocId)?.name === "Bond 6ml ボトル" ||
+            alphabetDocs.find((doc) => doc.id === selectedDocId)?.name === "Bond 30ml ボトル") && (
+            <div className="mb-4">
+              <label className="block font-bold mb-1">入庫ボトル数:</label>
+              <input
+                type="number"
+                className="border px-3 py-2 rounded-lg w-full max-w-md"
+                value={manualBottleCount}
+                onChange={(e) => setManualBottleCount(Number(e.target.value))}
+              />
+            </div>
+          )}
 
         {selectedDocId && (
           <div className="space-y-4">

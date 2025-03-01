@@ -108,7 +108,7 @@ export default function OutboundPage() {
       <h1 className="text-3xl font-bold mb-6 text-center text-indigo-700 drop-shadow-md">出庫処理</h1>
 
       {/* GS1 バーコード用 */}
-      <div className="border p-4 rounded-lg shadow-md mb-6 bg-gray-50">
+      <div className="border p-4 rounded-lg shadow-md mb-6 bg-red-100">
         <h2 className="text-xl font-semibold mb-4">GS1 バーコードスキャン</h2>
         <div className="flex items-center space-x-4">
           <input
@@ -132,7 +132,7 @@ export default function OutboundPage() {
       </div>
 
       {/* Roche バーコード用 */}
-      <div className="border p-4 rounded-lg shadow-md mb-6 bg-gray-50">
+      <div className="border p-4 rounded-lg shadow-md mb-6 bg-red-100">
         <h2 className="text-xl font-semibold mb-4">Roche バーコードスキャン</h2>
         <div className="flex items-center space-x-4">
           <input
@@ -155,10 +155,10 @@ export default function OutboundPage() {
       </div>
 
       {/* 手入力 出庫 */}
-      <div className="border p-6 rounded-lg shadow-md bg-gray-50">
+      <div className="border p-6 rounded-lg shadow-md bg-red-100">
         <h2 className="text-xl font-semibold mb-4">その他出庫</h2>
         <p className="mb-4 text-gray-600">
-          *GATA3, HNF4α, BondⅢ6ml30mlボトル, 手染めPBS, VENTANAクリアオーバーレイ, 各種ラベルキット, ABC液, ABC二次抗体はこちら
+          *GATA3, HNF4α, BondⅢ6ml 30mlボトル, 手染めPBS, VENTANAクリアオーバーレイ, 各種ラベルキット, ABC液, ABC二次抗体はこちら
         </p>
         <div className="flex items-center space-x-4 mb-4">
           <label className="font-bold">試薬選択:</label>
@@ -196,6 +196,12 @@ export default function OutboundPage() {
           </div>
         )}
       </div>
+
+      {/* 注意書き */}
+      <p className="mt-6 text-sm text-gray-600">
+        *Arginase-1, Bond Enzyme Pretreatment, DISH試薬, MSH2, MUC6, PD-L1(SP142)はまだ試薬登録していません。
+        上記試薬出庫時は大島を呼んでください。
+      </p>
 
       {/* エラーメッセージ */}
       {errorMessage && (
