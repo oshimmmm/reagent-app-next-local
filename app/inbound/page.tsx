@@ -301,8 +301,9 @@ export default function InboundPage() {
 
         {/* 選択された試薬が Bond 6ml ボトル または Bond 30ml ボトルの場合は、入庫ボトル数の入力を表示 */}
         {selectedDocId &&
-          (alphabetDocs.find((doc) => doc.id === selectedDocId)?.name === "Bond 6ml ボトル" ||
-            alphabetDocs.find((doc) => doc.id === selectedDocId)?.name === "Bond 30ml ボトル") && (
+          (alphabetDocs.find((doc) => doc.id === selectedDocId)?.name === "Bond 6mL ボトル" ||
+            alphabetDocs.find((doc) => doc.id === selectedDocId)?.name === "BOND 30mL ボトル" ||
+            alphabetDocs.find((doc) => doc.id === selectedDocId)?.name === "PBS(免染手染め用)50mL") && (
             <div className="mb-4">
               <label className="block font-bold mb-1">入庫ボトル数:</label>
               <input
