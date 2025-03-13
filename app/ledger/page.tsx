@@ -102,10 +102,10 @@ export default function LedgerPage() {
           <div className="flex justify-between items-start mb-4">
             <div>
               <h2 className="text-xl font-bold mb-2">
-                試薬在庫管理台帳 (2025-02-12~)
+                試薬在庫管理台帳
               </h2>
               <p className="text-base text-gray-500">
-                ＊2025-02-12以前に入出庫された試薬はここに表示されません。<br />
+                ＊2025/03/05以前の入出庫、在庫記録は試薬消耗品の在庫・使用開始日管理表にあります。<br />
                 必要に応じて、試薬消耗品の在庫・使用開始日管理表も参照してください。
               </p>
             </div>

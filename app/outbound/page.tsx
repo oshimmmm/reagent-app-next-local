@@ -14,6 +14,11 @@ export default function OutboundPage() {
   const [selectedDocId, setSelectedDocId] = useState<string>("");
   const [manualLot, setManualLot] = useState<string>("");
 
+  // モーダル表示用のstate
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  // API呼び出し時に使用するパラメータを保持
+  const [pendingOutbound, setPendingOutbound] = useState<{ productNumber: string; lotNumber: string } | null>(null);
+
   // input要素へのref (GS1 バーコード用)
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -88,19 +93,47 @@ export default function OutboundPage() {
    * 共通の出庫処理
    * APIエンドポイント /api/lots/outbound を呼び出し、出庫処理を実行する。
    */
-  const commonOutboundLogic = async (productNumber: string, lotNumber: string) => {
-    const res = await fetch("/api/lots/outbound", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productNumber, lotNumber, outboundQuantity: 1 }),
-    });
+  const commonOutboundLogic = async (productNumber: string, lotNumber: string, force: boolean = false) => {
+    try {
+      const res = await fetch("/api/lots/outbound", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productNumber, lotNumber, outboundQuantity: 1, force }),
+      });
 
-    if (!res.ok) {
-      const { error } = await res.json().catch(() => ({}));
-      throw new Error(error || "出庫処理に失敗しました。");
+      if (!res.ok) {
+        const responseData = await res.json();
+        // HTTP 409 が返ってきた場合は、確認モーダルを表示
+        if (res.status === 409 && responseData.error === "有効期限が近いロットが別にあります。本当に出庫しますか？") {
+          // 保存しておく
+          setPendingOutbound({ productNumber, lotNumber });
+          setShowConfirmModal(true);
+          return;
+        }
+        throw new Error(responseData.error || "出庫処理に失敗しました。");
+      }
+
+      alert(`出庫が完了しました: [${productNumber}] ロット: ${lotNumber}`);
+    } catch (error: unknown) {
+      console.error(error);
+      setErrorMessage(error instanceof Error ? error.message : "不明なエラーが発生しました。");
     }
+  };
 
-    alert(`出庫が完了しました: [${productNumber}] ロット: ${lotNumber}`);
+  // ユーザーがモーダルで「Yes」を選んだ場合の処理
+  const handleConfirmYes = async () => {
+    if (pendingOutbound) {
+      await commonOutboundLogic(pendingOutbound.productNumber, pendingOutbound.lotNumber, true);
+      setShowConfirmModal(false);
+      setPendingOutbound(null);
+    }
+  };
+
+  // ユーザーがモーダルで「No」を選んだ場合の処理
+  const handleConfirmNo = () => {
+    setShowConfirmModal(false);
+    setPendingOutbound(null);
+    setErrorMessage("出庫処理を中断しました。最初からやり直してください。");
   };
 
   return (
@@ -218,6 +251,31 @@ export default function OutboundPage() {
           </div>
         </div>
       )}
+      
+      {/* 出庫確認用モーダル */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-gray-700 bg-opacity-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md text-center">
+            <h2 className="text-xl font-bold mb-4">確認</h2>
+            <p className="mb-6">有効期限が近いロットが別にあります。本当に出庫しますか？</p>
+            <div className="flex justify-around">
+              <button
+                onClick={handleConfirmYes}
+                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors"
+              >
+                Yes
+              </button>
+              <button
+                onClick={handleConfirmNo}
+                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

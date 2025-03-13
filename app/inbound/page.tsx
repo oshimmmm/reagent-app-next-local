@@ -130,7 +130,7 @@ export default function InboundPage() {
     try {
       // 入庫処理時、もし選択された試薬の名称が "Bond 6ml ボトル" または "Bond 30ml ボトル" なら、manualBottleCount も渡す
       const selectedDoc = alphabetDocs.find((doc) => doc.id === selectedDocId);
-      const bottleCount = (selectedDoc && (selectedDoc.name === "Bond 6ml ボトル" || selectedDoc.name === "Bond 30ml ボトル"))
+      const bottleCount = (selectedDoc && (selectedDoc.name === "Bond 6mL ボトル" || selectedDoc.name === "BOND 30mL ボトル" || selectedDoc.name === "PBS(免染手染め用)50mL"))
         ? manualBottleCount
         : undefined;
       await commonIncomingLogic(selectedDocId, manualLot, expiryDate, bottleCount);
