@@ -68,7 +68,8 @@ const authOptions: AuthOptions = {
     },
   },
   pages: {
-    signIn: "/login",  // ログインページへのパス
+    // signIn: "/login"
+    signIn: "http://172.17.230.197:3002/login",  // ログインページへのパス
   },
   // debug: true,
 }

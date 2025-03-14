@@ -29,6 +29,8 @@ services:
       DATABASE_URL: "postgresql://postgres:${DB_PASSWORD}@reagent-db:5432/reagent_db"
     ports:
       - '3002:3002'
+    env_file:
+      - .env.docker
     depends_on:
       - reagent-db
     restart: always
