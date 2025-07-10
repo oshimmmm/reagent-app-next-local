@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  reagent-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: reagent-app-dev
+    # Next.js Dev サーバーを外部 (0.0.0.0) にバインド
+    command: npx next dev -H 0.0.0.0 -p 3000
+    # ソースコードをコンテナにマウントして即時反映
+    volumes:
+      - .:/app:rw
+      # node_modules はコンテナ内のものを利用
+      - /app/node_modules
+    ports:
+      - '3000:3000'
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD}@reagent-db:5432/reagent_db
+      - HOST=0.0.0.0
+      - PORT=3000
+      - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=100
+    depends_on:
+      - reagent-db
+
+  # reagent-db は本番と同じ設定を継承
+  reagent-db:
+    image: postgres:17
+    container_name: reagent-db-container
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: reagent_db
+    ports:
+      - '5433:5432'
+    volumes:
+      - reagent-db-data:/var/lib/postgresql/data
+      - ./db-init:/docker-entrypoint-initdb.d
+    restart: always
+
+volumes:
+  reagent-db-data:

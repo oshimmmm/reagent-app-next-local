@@ -5,6 +5,8 @@ WORKDIR /app
 
 # package.json と package-lock.json をコピーして依存関係インストール
 COPY package*.json ./
+COPY prisma ./prisma
+
 RUN npm install
 
 # アプリのソースをコピー
