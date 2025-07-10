@@ -29,26 +29,34 @@ export async function GET(
   }
 }
 
-// PATCH: 指定の試薬情報を更新する（例: orderDate, stock, valueStock）
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ productNumber: string }> }
 ) {
-  const resolvedParams = await context.params;
+  const { productNumber } = await context.params;
+  const payload = await request.json();
+
   try {
-    const { orderDate, stock, valueStock } = await request.json();
-    const updatedReagent = await prisma.reagent.update({
-      where: { productNumber: resolvedParams.productNumber },
+    const updated = await prisma.reagent.update({
+      where: { productNumber },
       data: {
-        // orderDate が truthy なら Date に変換、そうでなければ null をセット
-        orderDate: orderDate ? new Date(orderDate) : null,
-        stock,
-        valueStock,
+        name: payload.name,
+        location: payload.location,
+        orderTriggerStock: payload.orderTriggerStock,
+        orderTriggerExpiry: payload.orderTriggerExpiry,
+        noOrderOnZeroStock: payload.noOrderOnZeroStock,
+        orderTriggerValueStock: payload.noOrderOnZeroStock
+          ? payload.orderTriggerValueStock
+          : null,
+        valueStock: payload.valueStock,
+        orderValue: payload.orderValue,
+        orderQuantity: payload.orderQuantity,
+        hide: payload.hide,
       },
     });
-    return NextResponse.json(updatedReagent, { status: 200 });
+    return NextResponse.json(updated);
   } catch (error) {
-    console.error("PATCH /api/reagents/[productNumber] error:", error);
+    console.error(error);
     return NextResponse.json(
       { error: "試薬情報の更新に失敗しました" },
       { status: 500 }

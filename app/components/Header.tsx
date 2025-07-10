@@ -26,6 +26,7 @@ export default function Header() {
     { path: "/backup", label: "バックアップ" },
     { path: "/ledger", label: "在庫管理台帳" },
     { path: "/register", label: "試薬登録" },
+    { path: "/edit-reagent", label: "試薬情報編集" },
   ];
 
   // 管理者ユーザーのみ表示したいリンクを追加
@@ -42,7 +43,7 @@ export default function Header() {
     <header className="bg-gray-800 text-white px-6 py-4 shadow-md fixed top-0 left-0 w-full z-50">
       <div className="flex justify-between items-center max-w-7xl mx-auto">
         {/* ナビゲーション */}
-        <nav className="flex space-x-6">
+        <nav className="flex space-x-4 md:text-base">
           {linksToDisplay.map((link) => (
             <Link
               href={link.path}

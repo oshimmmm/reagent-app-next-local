@@ -29,6 +29,7 @@ interface APIReagent {
   noOrderOnZeroStock: boolean | null;
   orderTriggerValueStock: number | null;
   orderValue: string | null;
+  hide: boolean; // 非表示フラグ（trueならフロントでは表示しない）
 }
 
 /**
@@ -97,17 +98,17 @@ export default function OrderPage() {
         if (!res.ok) {
           throw new Error("試薬情報の取得に失敗しました");
         }
+        // すべての試薬を取得
         const data: APIReagent[] = await res.json();
 
-        const list: Reagent[] = [];
-        data.forEach((item) => {
-          // 各日付を "YYYY-MM-DD" 形式に整形
-          const maxExpiryStr = item.maxExpiry
-            ? formatDateString(item.maxExpiry)
-            : "";
-          const orderDateStr = item.orderDate ? formatDateString(item.orderDate) : "";
+        // ← ここで非表示フラグが立っているものを除外
+        const visible: APIReagent[] = data.filter((item) => !item.hide);
 
-          // 発注条件を判定（数値は null の場合は 0 として扱う）
+        // 発注対象のみをリスト化
+        const list: Reagent[] = [];
+        visible.forEach((item) => {
+          const maxExpiryStr = item.maxExpiry ? formatDateString(item.maxExpiry) : "";
+          const orderDateStr = item.orderDate ? formatDateString(item.orderDate) : "";
           const isOrder = checkOrderStatus(
             item.stock ?? 0,
             maxExpiryStr,
@@ -117,7 +118,6 @@ export default function OrderPage() {
             item.valueStock ?? 0,
             item.orderTriggerValueStock ?? null
           );
-
           if (isOrder) {
             list.push({
               productNumber: item.productNumber,
@@ -138,7 +138,6 @@ export default function OrderPage() {
         console.error("試薬一覧取得エラー:", error);
       }
     };
-
     fetchReagents();
   }, []);
 
@@ -163,11 +162,11 @@ export default function OrderPage() {
         prev.map((item) =>
           item.productNumber === r.productNumber
             ? {
-                ...item,
-                orderDate: checked
-                  ? new Date().toISOString().split("T")[0]
-                  : "",
-              }
+              ...item,
+              orderDate: checked
+                ? new Date().toISOString().split("T")[0]
+                : "",
+            }
             : item
         )
       );

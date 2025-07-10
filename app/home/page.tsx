@@ -23,6 +23,7 @@ interface ReagentFromDB {
   valueStock: number;
   createdAt: string;
   updatedAt: string;
+  hide: boolean;                   // 非表示フラグ (trueならフロントでは表示しない)
 }
 
 // =========================
@@ -125,8 +126,11 @@ export default function HomePage() {
         }
         const dbData: ReagentFromDB[] = await res.json();
 
+        // ← ここで非表示フラグが立っているものを除外
+        const visibleData = dbData.filter((item) => !item.hide);
+
         // 取得したデータをUI用に整形
-        const dataList: Reagent[] = dbData.map((item) => {
+        const dataList: Reagent[] = visibleData.map((item) => {
           const maxExpiryStr = formatDate(item.maxExpiry);
           const orderDateStr = formatDate(item.orderDate);
 
