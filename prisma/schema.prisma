@@ -29,6 +29,7 @@ model Reagent {
   orderValue             String?
   stock                  Int      @default(0)
   valueStock             Int      @default(0)
+  hide                   Boolean  @default(false)
 
   // 例: データ作成日時、更新日時を持たせる
   createdAt              DateTime @default(now())
