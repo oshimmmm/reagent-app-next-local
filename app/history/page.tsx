@@ -228,19 +228,21 @@ export default function HistoryPage() {
             </tr>
           </thead>
           <tbody>
-            {reagents.map((r) => (
-              <tr key={r.productNumber} className="odd:bg-white even:bg-gray-50">
-                <td className="border p-4 text-sm">{r.name}</td>
-                <td className="border p-4 text-center">
-                  <button
-                    onClick={() => handleShowHistory(r.productNumber)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    履歴表示
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {[...reagents]
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((r) => (
+                <tr key={r.productNumber} className="odd:bg-white even:bg-gray-50">
+                  <td className="border p-4 text-sm">{r.name}</td>
+                  <td className="border p-4 text-center">
+                    <button
+                      onClick={() => handleShowHistory(r.productNumber)}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      履歴表示
+                    </button>
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </div>
