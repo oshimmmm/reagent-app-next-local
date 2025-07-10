@@ -17,28 +17,12 @@ services:
       - '3000:3000'
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD}@reagent-db:5432/reagent_db
+      # host.docker.internal:5433 経由で本番 DB に接続
+      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD}@host.docker.internal:5433/reagent_db
       - HOST=0.0.0.0
       - PORT=3000
       - CHOKIDAR_USEPOLLING=true
       - CHOKIDAR_INTERVAL=100
-    depends_on:
-      - reagent-db
-
-  # reagent-db は本番と同じ設定を継承
-  reagent-db:
-    image: postgres:17
-    container_name: reagent-db-container
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: reagent_db
-    ports:
-      - '5433:5432'
-    volumes:
-      - reagent-db-data:/var/lib/postgresql/data
-      - ./db-init:/docker-entrypoint-initdb.d
-    restart: always
 
 volumes:
   reagent-db-data:
