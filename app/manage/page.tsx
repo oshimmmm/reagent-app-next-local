@@ -91,7 +91,7 @@ export default function ManagePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           productNumber: selectedReagent.productNumber,
-          actionType: "update",
+          actionType: "inventory",
           date: new Date().toISOString(),
           user: session?.user?.username || "unknown",
           oldStock: selectedReagent.stock,
