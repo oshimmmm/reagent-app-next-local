@@ -49,6 +49,9 @@ export async function PATCH(
           ? payload.orderTriggerValueStock
           : null,
         valueStock: payload.valueStock,
+        orderDate: payload.orderDate
+          ? new Date(payload.orderDate)
+          : null,
         orderValue: payload.orderValue,
         orderQuantity: payload.orderQuantity,
         hide: payload.hide,
