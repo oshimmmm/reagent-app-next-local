@@ -13,7 +13,7 @@ interface HistoryRecord {
   id: number; // Prisma の History モデルでは id は Int 型
   productNumber: string;
   lotNumber: string;
-  actionType: "inbound" | "outbound" | "update";
+  actionType: "inbound" | "outbound" | "update" | "inventory";
   date?: string; // ISO 8601 文字列
   user?: string;
   oldStock?: number;
@@ -263,6 +263,16 @@ export default function HistoryPage() {
                   <p className="text-sm">
                     日付: {h.date ? new Date(h.date).toLocaleString() : ""}
                   </p>
+                  {h.actionType === "inventory" && (
+                    <>
+                      <p className="text-sm">棚卸作業</p>
+                      <p className="text-sm">
+                        月末残量: {h.oldValueStock ?? 0} → {h.newValueStock ?? 0}
+                      </p>
+                    </>
+                  )}
+
+
                   {h.actionType === "inbound" && (
                     <>
                       <p className="text-sm">ロット番号: {h.lotNumber}</p>
