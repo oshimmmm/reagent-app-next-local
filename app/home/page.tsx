@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 
+interface InventoryInfo {
+  lastInventoryDate: string | null; // "YYYY-MM-DD"
+  nextInventoryDate: string | null; // "YYYY-MM-DD"
+}
+
 // =========================
 // データベース(Reagent)から取得する型 (DB直後の生データ)
 // =========================
@@ -58,6 +63,17 @@ function formatDate(dateStr: string | null): string {
   return d.toISOString().split("T")[0];
 }
 
+function getLastFridayOfMonth(ymd: string): string {
+    const [y, m] = ymd.split("-").map(Number);
+    // JS の month は 0 起算なので (m-1) を使い、日付は月を越えないよう 0日目でその月の最終日に
+    const d = new Date(Date.UTC(y, m, 0));
+    // 曜日は 0=日,1=月,…,5=金,6=土
+    while (d.getUTCDay() !== 5) {
+      d.setUTCDate(d.getUTCDate() - 1);
+    }
+    return d.toISOString().slice(0, 10);
+  }
+
 /**
  * 在庫や有効期限から発注の可否を判定する関数
  */
@@ -111,6 +127,11 @@ export default function HomePage() {
 
   // valueStock が 0 以外のデータのみ表示するかを制御する state
   const [filterValueStockNonZero, setFilterValueStockNonZero] = useState<boolean>(false);
+
+  const [inventoryInfo, setInventoryInfo] = useState<InventoryInfo>({
+    lastInventoryDate: null,
+    nextInventoryDate: null,
+  });
 
   // =========================
   // 1) DBからreagentsを取得
@@ -173,6 +194,15 @@ export default function HomePage() {
     };
 
     fetchReagents();
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/inventory")
+      .then((res) => res.json())
+      .then((info: InventoryInfo) => {
+        setInventoryInfo(info);
+      })
+      .catch((error) => console.error("Failed to fetch inventory info:", error));
   }, []);
 
 
@@ -247,6 +277,20 @@ export default function HomePage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+        <p className="text-lg">
+          最終棚卸日: {inventoryInfo.lastInventoryDate || "未実施"}
+        </p>
+        <p className="text-lg">
+          次回棚卸日：{
+            inventoryInfo.nextInventoryDate
+              ? getLastFridayOfMonth(inventoryInfo.nextInventoryDate)
+              : "未定"
+          }
+        </p>
+      </div>
+
+
       <h1 className="text-2xl font-bold my-4">ホーム</h1>
       <p className="text-xl font-bold my-4">＊月末残量に数値が入力されている試薬は、在庫数が0になっても発注しない試薬です。</p>
 
