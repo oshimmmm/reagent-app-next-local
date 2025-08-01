@@ -232,7 +232,7 @@ export default function OutboundPage() {
 
       {/* 注意書き */}
       <p className="mt-6 text-sm text-gray-600">
-        *Arginase-1, Bond Enzyme Pretreatment, DISH試薬, MSH2, MUC6, PD-L1(SP142)はまだ試薬登録していません。
+        *Arginase-1, Bond Enzyme Pretreatment, ISH Protease 3, MSH2はまだ試薬登録していません。<br />
         上記試薬出庫時は大島を呼んでください。
       </p>
 
