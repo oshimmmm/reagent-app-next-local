@@ -1,77 +1,53 @@
 // libs/parseNoGCode.ts
+
 export interface ParsedCode {
   productNumber: string;
   lotNumber: string;
   expiryDate: Date;
-  expiryDateString: string; // YYYY-MM-DD 形式を想定
+  expiryDateString: string; // YYYY-MM-DD
 }
 
+/**
+ * Roche製試薬のバーコードから情報を抽出する。フォーマット1（旧フォーマット: 6文字ロット/7文字ロット/8桁ロット）
+ * またはフォーマット2（新フォーマット: 8文字ロット＋11情報）に対応。
+ */
 export function parseNoGCode(code: string): ParsedCode {
-  // フォーマット1 (元の Roche コードフォーマット)
-  const format1Regex = /^01\d{14}10([A-Z]{1}\d{5}|\d{8})17\d{6}.+$/;
-
-  // フォーマット2 (新しいフォーマット)
-  const format2Regex = /^01\d{14}10[A-Z]\d{7}11\d{6}17\d{6}.+$/;
-
-  // コードがフォーマット1またはフォーマット2に一致しなければエラー
-  if (!format1Regex.test(code) && !format2Regex.test(code)) {
-    throw new Error("入力されたコードは有効な Roche コードではありません。");
-  }
-
-  // 商品番号を抽出
+  // 商品番号 (GTIN 部分)：先頭2文字を除いた次の14文字
   const productNumber = code.substring(2, 16);
 
-  // ロット番号と有効期限の抽出
-  let lotNumber = "";
-  let expiryDate: Date = new Date(0);
-  let expiryDateString = "";
+  // フォーマット1: 10 + (6桁ロット|7文字ロット|8桁ロット) + 17 + 有効期限(6桁)
+  const format1Regex = /^01\d{14}10([A-Z]\d{5}[A-Z]|[A-Z]\d{5}|\d{8})17(\d{6}).+$/;
+  // フォーマット2: 10 + 8文字ロット + 11 + 任意6桁 + 17 + 有効期限(6桁)
+  const format2Regex = /^01\d{14}10([A-Z]\d{7})11\d{6}17(\d{6}).+$/;
 
-  if (format1Regex.test(code)) {
-    // フォーマット1の処理
-    const lotStartIndex = 16 + 2; // "10" の直後
-    const lotRaw = code.substring(lotStartIndex, lotStartIndex + 8);
+  let lotNumber: string;
+  let expirationStr: string;
 
-    // ロット番号判定
-    if (/^[A-Z]\d{5}$/.test(lotRaw.substring(0, 6))) {
-      lotNumber = lotRaw.substring(0, 6); // 6文字ロット
-    } else if (/^\d{8}$/.test(lotRaw)) {
-      lotNumber = lotRaw.substring(0, 8); // 8桁ロット
-    } else {
-      throw new Error("ロット番号が無効です。");
+  const m1 = code.match(format1Regex);
+  if (m1) {
+    lotNumber     = m1[1];         // 6桁 or 7文字 or 8桁ロット
+    expirationStr = m1[2];         // YYMMDD
+  } else {
+    const m2 = code.match(format2Regex);
+    if (!m2) {
+      throw new Error("入力されたコードは有効な Roche コードではありません。");
     }
-
-    // 有効期限
-    const expirationStartIndex = lotStartIndex + lotNumber.length + 2; // "17" の直後
-    const expiration = code.substring(expirationStartIndex, expirationStartIndex + 6);
-    expiryDate = parseExpiration(expiration);
-    expiryDateString = expiryDate.toISOString().split("T")[0]; // YYYY-MM-DD
-
-  } else if (format2Regex.test(code)) {
-    // フォーマット2の処理
-    const lotStartIndex = 16 + 2; // "10" の直後
-    lotNumber = code.substring(lotStartIndex, lotStartIndex + 8); // 8文字ロット
-
-    // 有効期限
-    const expirationStartIndex = lotStartIndex + 8 + 2 + 6 + 2; // "17" の直後
-    const expiration = code.substring(expirationStartIndex, expirationStartIndex + 6);
-    expiryDate = parseExpiration(expiration);
-    expiryDateString = expiryDate.toISOString().split("T")[0]; // YYYY-MM-DD
-
+    lotNumber     = m2[1];         // 8文字ロット
+    expirationStr = m2[2];         // YYMMDD
   }
 
-  // 結果を返す
-  return {
-    productNumber,
-    lotNumber,
-    expiryDate,
-    expiryDateString,
-  };
+  const expiryDate = parseExpiration(expirationStr);
+  const expiryDateString = expiryDate.toISOString().split("T")[0];  // YYYY-MM-DD
+
+  return { productNumber, lotNumber, expiryDate, expiryDateString };
 }
 
-// 有効期限を解析して Date オブジェクトを返す関数
-function parseExpiration(expiration: string): Date {
-  const expYear = parseInt("20" + expiration.substring(0, 2), 10); // 20XX年
-  const expMonth = parseInt(expiration.substring(2, 4), 10); // 月
-  const expDay = parseInt(expiration.substring(4, 6), 10); // 日
-  return new Date(Date.UTC(expYear, expMonth - 1, expDay)); // 月は0始まり
+/**
+ * YYMMDD 形式の文字列を UTC Date に変換 (月は0始まり)
+ */
+function parseExpiration(exp: string): Date {
+  const year  = parseInt("20" + exp.substring(0, 2), 10);
+  const month = parseInt(exp.substring(2, 4), 10);
+  const day   = parseInt(exp.substring(4, 6), 10);
+  return new Date(Date.UTC(year, month - 1, day));
 }
