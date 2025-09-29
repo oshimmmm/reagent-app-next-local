@@ -267,6 +267,9 @@ export default function HistoryPage() {
                     <>
                       <p className="text-sm">棚卸作業</p>
                       <p className="text-sm">
+                        編集者: {h.user || "不明"}
+                      </p>
+                      <p className="text-sm">
                         月末残量: {h.oldValueStock ?? 0} → {h.newValueStock ?? 0}
                       </p>
                     </>
@@ -364,6 +367,15 @@ export default function HistoryPage() {
                         月末残量: {h.oldValueStock ?? 0} → {h.newValueStock ?? 0}
                       </p>
                       <p className="text-sm">試薬情報の編集</p>
+                    </>
+                  )}
+                  {h.actionType === "inventory" && (
+                    <>
+                      <p className="text-sm">棚卸作業</p>
+                      <p className="text-sm">編集者: {h.user || "不明"}</p>
+                      <p className="text-sm">
+                        月末残量: {h.oldValueStock ?? 0} → {h.newValueStock ?? 0}
+                      </p>
                     </>
                   )}
                 </div>

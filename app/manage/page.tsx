@@ -156,7 +156,8 @@ export default function ManagePage() {
       <p className="text-red-3xl font-bold text-center mb-8">
         棚卸時の月末残量の修正のみ行う<br />
         ☆在庫数の修正はここで行わない☆<br />
-        在庫数がおかしいと思ったら、入庫もしくは出庫処理で帳尻を合わせてください。
+        在庫数がおかしいと思ったら、入庫もしくは出庫処理で帳尻を合わせてください。<br />
+        このページで更新ボタンを押した日付が、棚卸実施日になります。
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* 試薬一覧 */}
