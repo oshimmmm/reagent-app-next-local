@@ -113,7 +113,25 @@ export default function OutboundPage() {
         throw new Error(responseData.error || "出庫処理に失敗しました。");
       }
 
-      alert(`出庫が完了しました: [${productNumber}] ロット: ${lotNumber}`);
+      let displayName = productNumber;
+      const fromList = alphabetDocs.find(d => d.id === productNumber)?.name?.trim();
+      if (fromList && fromList.length > 0) {
+        displayName = fromList;
+      } else {
+        try {
+          const r = await fetch(`/api/reagents/${encodeURIComponent(productNumber)}`);
+          if (r.ok) {
+            const data = await r.json(); // { name?: string, ... } を想定
+            if (data?.name && String(data.name).trim().length > 0) {
+              displayName = data.name;
+            }
+          }
+        } catch {
+          // 取得失敗時は productNumber のまま
+        }
+      }
+
+      alert(`出庫が完了しました: [${displayName}] ロット: ${lotNumber}`);
     } catch (error: unknown) {
       console.error(error);
       setErrorMessage(error instanceof Error ? error.message : "不明なエラーが発生しました。");
@@ -251,7 +269,7 @@ export default function OutboundPage() {
           </div>
         </div>
       )}
-      
+
       {/* 出庫確認用モーダル */}
       {showConfirmModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-gray-700 bg-opacity-50">

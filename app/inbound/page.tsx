@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { parseCode } from "../libs/parseCode";
@@ -206,8 +206,13 @@ export default function InboundPage() {
         throw new Error(errorData.error || "入庫処理中にエラーが発生しました");
       }
 
+      const displayName =
+        (reagentData.name && reagentData.name.trim().length > 0)
+          ? reagentData.name
+          : productNumber;
+
       alert(
-        `入庫が完了しました: [${productNumber}] ロット: ${lotNumber} 有効期限: ${expiryDate.toLocaleDateString()}`
+        `入庫が完了しました: [${displayName}] ロット: ${lotNumber} 有効期限: ${expiryDate.toLocaleDateString()}`
       );
 
       // 入庫処理後のリセット
@@ -373,7 +378,7 @@ export default function InboundPage() {
           <div className="bg-white p-6 rounded-lg shadow-lg">
             <h2 className="text-xl font-bold mb-4">規格を入力してください</h2>
             <div className="mb-4">
-              <label className="block mb-1 font-semibold">規格 (μL) ロシュ試薬はテスト数:</label>
+              <label className="block mb-1 font-semibold">規格 (μL)<br/>ロシュ試薬はテスト数<br/>Bond Enzyme Pretreatment Kitは1000(μL)</label>
               <input
                 type="number"
                 className="border px-3 py-2 w-full rounded-lg"
