@@ -1,6 +1,7 @@
 // app/api/lots/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/libs/prisma";
+import { getValidStockForReagent } from "@/app/libs/stock";
 
 /**
  * GET /api/lots
@@ -9,9 +10,16 @@ import { prisma } from "@/app/libs/prisma";
  */
 export async function GET() {
   try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const lots = await prisma.lot.findMany({
       where: {
-        stock: { gt: 0 }  // 在庫が0より大きいもののみ
+        stock: { gt: 0 },  // 在庫が0より大きいもののみ
+        OR: [
+          { expiryDate: null },
+          { expiryDate: { gte: today } },
+        ],
       },
       include: {
         reagent: true, // Reagent の情報も取得
@@ -48,6 +56,11 @@ export async function POST(request: Request) {
         expiryDate: expiryDate ? new Date(expiryDate) : null,
         stock: stock ?? 0,
       },
+    });
+    const validStock = await getValidStockForReagent(reagentId);
+    await prisma.reagent.update({
+      where: { id: reagentId },
+      data: { stock: validStock },
     });
     return NextResponse.json(newLot, { status: 201 });
   } catch (error) {

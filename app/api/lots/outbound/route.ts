@@ -1,6 +1,7 @@
 // app/api/lots/outbound/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/libs/prisma";
+import { getValidStockForReagent } from "@/app/libs/stock";
 
 export async function POST(request: NextRequest) {
   try {
@@ -89,10 +90,11 @@ export async function POST(request: NextRequest) {
     });
 
     // 4) Reagent の在庫も減算
+    const validStock = await getValidStockForReagent(reagent.id);
     await prisma.reagent.update({
       where: { id: reagent.id },
       data: {
-        stock: { decrement: outboundQuantity },
+        stock: validStock,
         currentLot: lotNumber,
       },
     });

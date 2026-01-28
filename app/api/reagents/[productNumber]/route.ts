@@ -1,6 +1,7 @@
 // app/api/reagents/[productNumber]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/libs/prisma";
+import { getValidStockForReagent } from "@/app/libs/stock";
 
 // GET: 指定の productNumber の試薬情報を取得する
 export async function GET(
@@ -19,7 +20,8 @@ export async function GET(
         { status: 404 }
       );
     }
-    return NextResponse.json(reagent, { status: 200 });
+    const validStock = await getValidStockForReagent(reagent.id);
+    return NextResponse.json({ ...reagent, stock: validStock }, { status: 200 });
   } catch (error) {
     console.error("GET /api/reagents/[productNumber] error:", error);
     return NextResponse.json(
@@ -37,6 +39,18 @@ export async function PATCH(
   const payload = await request.json();
 
   try {
+    const reagent = await prisma.reagent.findUnique({
+      where: { productNumber },
+      select: { id: true },
+    });
+    if (!reagent) {
+      return NextResponse.json(
+        { error: "試薬が見つかりません" },
+        { status: 404 }
+      );
+    }
+
+    const validStock = await getValidStockForReagent(reagent.id);
     const updated = await prisma.reagent.update({
       where: { productNumber },
       data: {
@@ -49,6 +63,7 @@ export async function PATCH(
           ? payload.orderTriggerValueStock
           : null,
         valueStock: payload.valueStock,
+        stock: validStock,
         orderDate: payload.orderDate
           ? new Date(payload.orderDate)
           : null,
@@ -57,7 +72,7 @@ export async function PATCH(
         hide: payload.hide,
       },
     });
-    return NextResponse.json(updated);
+    return NextResponse.json({ ...updated, stock: validStock });
   } catch (error) {
     console.error(error);
     return NextResponse.json(

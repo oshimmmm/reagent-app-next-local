@@ -1,6 +1,7 @@
 // app/api/lots/[lotId]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/libs/prisma";
+import { syncReagentStockFromLots } from "@/app/libs/stock";
 
 // ========================
 // 1) GET /api/lots/[lotId]
@@ -46,6 +47,14 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid lotId" }, { status: 400 });
     }
 
+    const existingLot = await prisma.lot.findUnique({
+      where: { id: lotId },
+      select: { reagentId: true },
+    });
+    if (!existingLot) {
+      return NextResponse.json({ error: "Lot not found" }, { status: 404 });
+    }
+
     const { lotNumber, expiryDate, stock } = await request.json();
     const updated = await prisma.lot.update({
       where: { id: lotId },
@@ -55,6 +64,7 @@ export async function PATCH(
         stock: stock ?? 0,
       },
     });
+    await syncReagentStockFromLots(existingLot.reagentId);
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {
     console.error("PATCH /api/lots/[lotId] error:", error);
@@ -75,9 +85,17 @@ export async function DELETE(
     if (isNaN(lotId)) {
       return NextResponse.json({ error: "Invalid lotId" }, { status: 400 });
     }
+    const existingLot = await prisma.lot.findUnique({
+      where: { id: lotId },
+      select: { reagentId: true },
+    });
+    if (!existingLot) {
+      return NextResponse.json({ error: "Lot not found" }, { status: 404 });
+    }
     const deleted = await prisma.lot.delete({
       where: { id: lotId },
     });
+    await syncReagentStockFromLots(existingLot.reagentId);
     return NextResponse.json(deleted, { status: 200 });
   } catch (error) {
     console.error("DELETE /api/lots/[lotId] error:", error);

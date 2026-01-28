@@ -1,6 +1,7 @@
 // app/api/inbound/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/libs/prisma";
+import { getValidStockForReagent } from "@/app/libs/stock";
 
 /**
  * POST /api/inbound
@@ -115,10 +116,12 @@ export async function POST(request: Request) {
 
     // 既存の valueStock を更新したいなら inputValueStock を使う
     // あるいは複数ロット管理で valueStock 自体廃止するなら削除
+    const validStock = await getValidStockForReagent(reagent.id);
     await prisma.reagent.update({
       where: { id: reagent.id },
       data: {
         maxExpiry: newMaxExpiry > new Date("1900-01-01") ? newMaxExpiry : null,
+        stock: validStock,
         ...(typeof inputValueStock === "number" && {
           valueStock: inputValueStock,
         }),

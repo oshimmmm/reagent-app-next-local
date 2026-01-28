@@ -57,17 +57,26 @@ export default function LedgerPage() {
       }
       const data: LotWithReagent[] = await res.json();
 
-      // 取得した各 Lot 情報から、LedgerItem を生成する
-      const items: LedgerItem[] = data.map((lot) => ({
-        id: lot.id,
-        productNumber: lot.reagent.productNumber,
-        name: lot.reagent.name ?? "",
-        lot: lot.lotNumber,
-        stock: lot.stock,
-        expiry: lot.expiryDate
-          ? new Date(lot.expiryDate).toLocaleDateString()
-          : "",
-      }));
+      // 有効期限切れを除外しつつ台帳データを生成
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const items: LedgerItem[] = data
+        .filter((lot) => {
+          if (!lot.expiryDate) return true;
+          const expiry = new Date(lot.expiryDate);
+          if (isNaN(expiry.getTime())) return false;
+          return expiry >= today;
+        })
+        .map((lot) => ({
+          id: lot.id,
+          productNumber: lot.reagent.productNumber,
+          name: lot.reagent.name ?? "",
+          lot: lot.lotNumber,
+          stock: lot.stock,
+          expiry: lot.expiryDate
+            ? new Date(lot.expiryDate).toLocaleDateString()
+            : "",
+        }));
 
       setLedgerItems(items);
       setShowTable(true);

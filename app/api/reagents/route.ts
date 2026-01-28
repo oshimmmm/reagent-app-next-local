@@ -2,12 +2,18 @@
 // 全試薬一覧の取得（GET）と、新規試薬の登録（POST）を実装
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/libs/prisma";
+import { getValidStockMap } from "@/app/libs/stock";
 
 // GET: 全試薬情報を取得する
 export async function GET() {
   try {
     const reagents = await prisma.reagent.findMany();
-    return NextResponse.json(reagents, { status: 200 });
+    const validStockMap = await getValidStockMap(reagents.map((r) => r.id));
+    const response = reagents.map((reagent) => ({
+      ...reagent,
+      stock: validStockMap.get(reagent.id) ?? 0,
+    }));
+    return NextResponse.json(response, { status: 200 });
   } catch (error) {
     console.error("GET /api/reagents error:", error);
     return NextResponse.json(

@@ -1,6 +1,7 @@
 // app/api/lots/inbound/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/libs/prisma";
+import { getValidStockForReagent } from "@/app/libs/stock";
 
 /**
  * POST /api/lots/inbound
@@ -111,12 +112,12 @@ export async function POST(request: NextRequest) {
     const finalMax = newMaxExpiry > new Date("1900-01-01") ? newMaxExpiry : null;
 
     // valueStock (既存ロジック互換) の更新もここで行う
+    const validStock = await getValidStockForReagent(reagent.id);
     await prisma.reagent.update({
       where: { id: reagent.id },
       data: {
         maxExpiry: finalMax,
-        // ここで Reagent.stock を inboundQuantity 分加算する
-        stock: { increment: inboundQuantity },
+        stock: validStock,
         orderDate: null,
         ...(typeof inputValueStock === "number" && { valueStock: inputValueStock }),
       },

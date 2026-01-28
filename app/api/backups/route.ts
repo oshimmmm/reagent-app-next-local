@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/libs/prisma";
 import ExcelJS from "exceljs";
+import { getValidStockMap } from "@/app/libs/stock";
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,6 +29,7 @@ export async function GET(request: NextRequest) {
 
     // Reagent と Lot は全件取得（全データを出力）
     const reagents = await prisma.reagent.findMany();
+    const validStockMap = await getValidStockMap(reagents.map((r) => r.id));
     const lots = await prisma.lot.findMany({
       include: { reagent: true },
     });
@@ -68,7 +70,7 @@ export async function GET(request: NextRequest) {
         name: r.name || "",
         currentLot: r.currentLot || "",
         maxExpiry: r.maxExpiry ? new Date(r.maxExpiry).toLocaleDateString() : "",
-        stock: r.stock,
+        stock: validStockMap.get(r.id) ?? r.stock,
         valueStock: r.valueStock,
         orderDate: r.orderDate ? new Date(r.orderDate).toLocaleDateString() : "",
         orderQuantity: r.orderQuantity,
