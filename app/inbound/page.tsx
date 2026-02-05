@@ -22,6 +22,7 @@ export default function InboundPage() {
   // バーコードの入力
   const [scanValue, setScanValue] = useState("");
   const [scanNoGValue, setScanNoGValue] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Popupや規格の入力（valueStock が 0以外ならポップアップを表示する）
   const [showPopup, setShowPopup] = useState(false);
@@ -72,6 +73,7 @@ export default function InboundPage() {
 
   // ========== GS1 バーコード用 入庫処理 ==========
   const handleIncoming = async () => {
+    if (isProcessing) return;
     if (!scanValue) return;
     try {
       const { productNumber, lotNumber, expiryDate } = parseCode(scanValue);
@@ -87,6 +89,7 @@ export default function InboundPage() {
 
   // ========== Roche バーコード用 入庫処理 ==========
   const handleNoGIncoming = async () => {
+    if (isProcessing) return;
     if (!scanNoGValue) return;
     try {
       const { productNumber, lotNumber, expiryDate } = parseNoGCode(scanNoGValue);
@@ -102,6 +105,7 @@ export default function InboundPage() {
 
   // ========== 選択＋手入力 での入庫処理 ==========
   const handleManualIncoming = async () => {
+    if (isProcessing) return;
     if (!selectedDocId) {
       setErrorMessage("試薬を選択してください。");
       return;
@@ -150,6 +154,7 @@ export default function InboundPage() {
    */
   const commonIncomingLogic = async (productNumber: string, lotNumber: string, expiryDate: Date, bottleCount?: number) => {
     try {
+      setIsProcessing(true);
       // 1) DBからReagentを取得
       const res = await fetch(`/api/reagents/${encodeURIComponent(productNumber)}`);
       if (!res.ok) throw new Error("該当する試薬が存在しません。先に登録してください。");
@@ -162,6 +167,7 @@ export default function InboundPage() {
 
       // 2) valueStock != 0 の場合はポップアップを表示（既存ロジックを維持）
       if (reagentData.valueStock !== 0 && reagentData.valueStock !== undefined) {
+        setIsProcessing(false);
         setShowPopup(true);
         return;
       }
@@ -171,6 +177,8 @@ export default function InboundPage() {
     } catch (error: unknown) {
       console.error(error);
       throw error; // 上位で setErrorMessage
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -183,6 +191,7 @@ export default function InboundPage() {
     bottleCount?: number
   ) => {
     try {
+      setIsProcessing(true);
       // 既存のロジック: maxExpiry の更新や stock + 1 などがあったが、
       // 複数ロット管理ではLotモデルを操作する想定
       // 例としてLotのupsert用API "/api/lots/inbound" を呼ぶ
@@ -211,6 +220,7 @@ export default function InboundPage() {
           ? reagentData.name
           : productNumber;
 
+      setIsProcessing(false);
       alert(
         `入庫が完了しました: [${displayName}] ロット: ${lotNumber} 有効期限: ${expiryDate.toLocaleDateString()}`
       );
@@ -223,6 +233,8 @@ export default function InboundPage() {
     } catch (error) {
       console.error(error);
       alert("入庫処理中にエラーが発生しました。");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -249,10 +261,12 @@ export default function InboundPage() {
             onKeyDown={(e) => {
               if (e.key === "Enter") handleIncoming();
             }}
+            disabled={isProcessing}
           />
           <button
             onClick={handleIncoming}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            disabled={isProcessing}
           >
             入庫
           </button>
@@ -272,10 +286,12 @@ export default function InboundPage() {
             onKeyDown={(e) => {
               if (e.key === "Enter") handleNoGIncoming();
             }}
+            disabled={isProcessing}
           />
           <button
             onClick={handleNoGIncoming}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            disabled={isProcessing}
           >
             Roche試薬入庫
           </button>
@@ -294,6 +310,7 @@ export default function InboundPage() {
             value={selectedDocId}
             onChange={(e) => setSelectedDocId(e.target.value)}
             className="border px-3 py-2 rounded-lg"
+            disabled={isProcessing}
           >
             <option value="">-- 選択してください --</option>
             {alphabetDocs.map((doc) => (
@@ -316,6 +333,7 @@ export default function InboundPage() {
                 className="border px-3 py-2 rounded-lg w-full max-w-md"
                 value={manualBottleCount}
                 onChange={(e) => setManualBottleCount(Number(e.target.value))}
+                disabled={isProcessing}
               />
             </div>
           )}
@@ -329,6 +347,7 @@ export default function InboundPage() {
                 className="border px-3 py-2 rounded-lg w-full max-w-md"
                 value={manualLot}
                 onChange={(e) => setManualLot(e.target.value)}
+                disabled={isProcessing}
               />
             </div>
             <div>
@@ -338,11 +357,13 @@ export default function InboundPage() {
                 className="border px-3 py-2 rounded-lg w-full max-w-md"
                 value={manualExpiry}
                 onChange={(e) => setManualExpiry(e.target.value)}
+                disabled={isProcessing}
               />
             </div>
             <button
               onClick={handleManualIncoming}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+              disabled={isProcessing}
             >
               その他入庫
             </button>
@@ -352,7 +373,7 @@ export default function InboundPage() {
 
       {/* 注意書き */}
       <p className="mt-6 text-sm text-gray-600">
-        *Arginase-1, Bond Enzyme Pretreatment, ISH Protease 3, MSH2はまだ試薬登録していません。
+        *Arginase-1はまだ試薬登録していません。
         上記試薬入庫時は大島を呼んでください。
       </p>
 
@@ -364,7 +385,8 @@ export default function InboundPage() {
             <p className="mb-6">{errorMessage}</p>
             <button
               onClick={() => setErrorMessage(null)}
-              className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
+              className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+              disabled={isProcessing}
             >
               閉じる
             </button>
@@ -386,6 +408,7 @@ export default function InboundPage() {
                 onChange={(e) =>
                   setInputValueStock(e.target.value ? Number(e.target.value) : null)
                 }
+                disabled={isProcessing}
               />
             </div>
             <div className="flex space-x-4">
@@ -398,7 +421,8 @@ export default function InboundPage() {
                     currentProductNumber
                   )
                 }
-                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                disabled={isProcessing}
               >
                 入庫を完了
               </button>
@@ -407,11 +431,21 @@ export default function InboundPage() {
                   setShowPopup(false);
                   setInputValueStock(null);
                 }}
-                className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
+                className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                disabled={isProcessing}
               >
                 キャンセル
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {isProcessing && (
+        <div className="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-40 z-50">
+          <div className="bg-white rounded-lg shadow-lg px-6 py-4 flex items-center space-x-3">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+            <p className="font-semibold text-blue-700">処理中です…</p>
           </div>
         </div>
       )}

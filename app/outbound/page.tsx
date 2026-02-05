@@ -8,6 +8,7 @@ export default function OutboundPage() {
   const [scanValue, setScanValue] = useState("");
   const [scanNoGValue, setScanNoGValue] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // 手入力用（その他出庫）の状態
   const [alphabetDocs, setAlphabetDocs] = useState<{ id: string; name: string }[]>([]);
@@ -45,6 +46,7 @@ export default function OutboundPage() {
 
   // 2) GS1 バーコードによる出庫処理
   const handleOutbound = async () => {
+    if (isProcessing) return;
     if (!scanValue) return;
     try {
       const { productNumber, lotNumber } = parseCode(scanValue);
@@ -58,6 +60,7 @@ export default function OutboundPage() {
 
   // 3) Roche バーコードによる出庫処理
   const handleNoGOutbound = async () => {
+    if (isProcessing) return;
     if (!scanNoGValue) return;
     try {
       const { productNumber, lotNumber } = parseNoGCode(scanNoGValue);
@@ -71,6 +74,7 @@ export default function OutboundPage() {
 
   // 4) 手入力による出庫処理
   const handleManualOutbound = async () => {
+    if (isProcessing) return;
     if (!selectedDocId) {
       setErrorMessage("試薬を選択してください。");
       return;
@@ -95,6 +99,7 @@ export default function OutboundPage() {
    */
   const commonOutboundLogic = async (productNumber: string, lotNumber: string, force: boolean = false) => {
     try {
+      setIsProcessing(true);
       const res = await fetch("/api/lots/outbound", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -108,6 +113,7 @@ export default function OutboundPage() {
           // 保存しておく
           setPendingOutbound({ productNumber, lotNumber });
           setShowConfirmModal(true);
+          setIsProcessing(false);
           return;
         }
         throw new Error(responseData.error || "出庫処理に失敗しました。");
@@ -131,15 +137,19 @@ export default function OutboundPage() {
         }
       }
 
+      setIsProcessing(false);
       alert(`出庫が完了しました: [${displayName}] ロット: ${lotNumber}`);
     } catch (error: unknown) {
       console.error(error);
       setErrorMessage(error instanceof Error ? error.message : "不明なエラーが発生しました。");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   // ユーザーがモーダルで「Yes」を選んだ場合の処理
   const handleConfirmYes = async () => {
+    if (isProcessing) return;
     if (pendingOutbound) {
       await commonOutboundLogic(pendingOutbound.productNumber, pendingOutbound.lotNumber, true);
       setShowConfirmModal(false);
@@ -172,10 +182,12 @@ export default function OutboundPage() {
             onKeyDown={(e) => {
               if (e.key === "Enter") handleOutbound();
             }}
+            disabled={isProcessing}
           />
           <button
             onClick={handleOutbound}
-            className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
+            className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+            disabled={isProcessing}
           >
             出庫
           </button>
@@ -195,10 +207,12 @@ export default function OutboundPage() {
             onKeyDown={(e) => {
               if (e.key === "Enter") handleNoGOutbound();
             }}
+            disabled={isProcessing}
           />
           <button
             onClick={handleNoGOutbound}
-            className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
+            className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+            disabled={isProcessing}
           >
             Roche試薬出庫
           </button>
@@ -217,6 +231,7 @@ export default function OutboundPage() {
             value={selectedDocId}
             onChange={(e) => setSelectedDocId(e.target.value)}
             className="border px-3 py-2 rounded-lg"
+            disabled={isProcessing}
           >
             <option value="">-- 選択してください --</option>
             {alphabetDocs.map((doc) => (
@@ -236,11 +251,13 @@ export default function OutboundPage() {
                 className="border px-3 py-2 rounded-lg w-full max-w-md"
                 value={manualLot}
                 onChange={(e) => setManualLot(e.target.value)}
+                disabled={isProcessing}
               />
             </div>
             <button
               onClick={handleManualOutbound}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+              disabled={isProcessing}
             >
               その他出庫
             </button>
@@ -250,7 +267,7 @@ export default function OutboundPage() {
 
       {/* 注意書き */}
       <p className="mt-6 text-sm text-gray-600">
-        *Arginase-1, Bond Enzyme Pretreatment, ISH Protease 3, MSH2はまだ試薬登録していません。<br />
+        *Arginase-1はまだ試薬登録していません。<br />
         上記試薬出庫時は大島を呼んでください。
       </p>
 
@@ -262,7 +279,8 @@ export default function OutboundPage() {
             <p className="mb-6">{errorMessage}</p>
             <button
               onClick={() => setErrorMessage(null)}
-              className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
+              className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+              disabled={isProcessing}
             >
               閉じる
             </button>
@@ -279,13 +297,15 @@ export default function OutboundPage() {
             <div className="flex justify-around">
               <button
                 onClick={handleConfirmYes}
-                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors"
+                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors disabled:opacity-50"
+                disabled={isProcessing}
               >
                 Yes
               </button>
               <button
                 onClick={handleConfirmNo}
-                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
+                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors disabled:opacity-50"
+                disabled={isProcessing}
               >
                 No
               </button>
@@ -294,6 +314,14 @@ export default function OutboundPage() {
         </div>
       )}
 
+      {isProcessing && (
+        <div className="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-40 z-50">
+          <div className="bg-white rounded-lg shadow-lg px-6 py-4 flex items-center space-x-3">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+            <p className="font-semibold text-red-700">処理中です…</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
