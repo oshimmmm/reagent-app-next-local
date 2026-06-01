@@ -132,6 +132,8 @@ export default function HomePage() {
     lastInventoryDate: null,
     nextInventoryDate: null,
   });
+  const [selectedInventoryDate, setSelectedInventoryDate] = useState<string>("");
+  const [savingInventoryDate, setSavingInventoryDate] = useState<boolean>(false);
 
   // =========================
   // 1) DBからreagentsを取得
@@ -201,9 +203,41 @@ export default function HomePage() {
       .then((res) => res.json())
       .then((info: InventoryInfo) => {
         setInventoryInfo(info);
+        if (info.lastInventoryDate) {
+          setSelectedInventoryDate(info.lastInventoryDate);
+        }
       })
       .catch((error) => console.error("Failed to fetch inventory info:", error));
   }, []);
+
+  const handleSaveInventoryDate = async () => {
+    if (!selectedInventoryDate) {
+      alert("日付を選択してください");
+      return;
+    }
+    setSavingInventoryDate(true);
+    try {
+      const res = await fetch("/api/inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: selectedInventoryDate }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "最終棚卸日の保存に失敗しました");
+      }
+      const info: InventoryInfo = await res.json();
+      setInventoryInfo(info);
+      if (info.lastInventoryDate) {
+        setSelectedInventoryDate(info.lastInventoryDate);
+      }
+    } catch (error: unknown) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : "予期せぬエラーが発生しました");
+    } finally {
+      setSavingInventoryDate(false);
+    }
+  };
 
 
   // =========================
@@ -278,10 +312,26 @@ export default function HomePage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-        <p className="text-lg">
-          最終棚卸日: {inventoryInfo.lastInventoryDate || "未実施"}
-        </p>
-        <p className="text-lg">
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-lg">
+            最終棚卸日: {inventoryInfo.lastInventoryDate || "未実施"}
+          </p>
+          <input
+            type="date"
+            value={selectedInventoryDate}
+            onChange={(e) => setSelectedInventoryDate(e.target.value)}
+            className="border border-gray-300 rounded px-2 py-1"
+          />
+          <button
+            type="button"
+            onClick={handleSaveInventoryDate}
+            disabled={savingInventoryDate}
+            className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {savingInventoryDate ? "保存中..." : "最終棚卸日を更新"}
+          </button>
+        </div>
+        <p className="text-lg mt-2">
           次回棚卸日：{
             inventoryInfo.nextInventoryDate
               ? getLastFridayOfMonth(inventoryInfo.nextInventoryDate)
