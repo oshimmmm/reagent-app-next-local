@@ -45,6 +45,15 @@ const authOptions: AuthOptions = {
     strategy: "jwt",  // or "database"
   },
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      const loginUrl = "http://172.17.231.25:3002/login"
+
+      if (url === loginUrl) return loginUrl
+      if (url.startsWith("/")) return `${baseUrl}${url}`
+      if (new URL(url).origin === baseUrl) return url
+
+      return baseUrl
+    },
     async jwt({ token, user }) {
       if (user) {
         // user が存在 = 初回ログイン成功時
@@ -69,7 +78,7 @@ const authOptions: AuthOptions = {
   },
   pages: {
     // signIn: "/login"
-    signIn: "http://172.17.230.197:3002/login",  // ログインページへのパス
+    signIn: "http://172.17.231.25:3002/login",  // ログインページへのパス
   },
   // debug: true,
 }
