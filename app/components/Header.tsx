@@ -66,7 +66,7 @@ export default function Header() {
           </span>
           <button
             // onClick={() => signOut({ callbackUrl: "/login" })}
-            onClick={() => signOut({ callbackUrl: "http://172.17.230.197:3002/login" })}
+            onClick={() => signOut({ callbackUrl: "http://172.17.231.25:3002/login" })}
             className="bg-red-500 hover:bg-red-600 text-white text-sm font-medium px-4 py-2 rounded"
           >
             ログアウト
